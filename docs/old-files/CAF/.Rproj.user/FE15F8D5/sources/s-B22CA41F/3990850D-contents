@@ -1,0 +1,83 @@
+
+# Data analysis
+# FGSC perithecial production on three substrates
+
+# loading packages
+
+library(readxl)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(magrittr)
+library(ggplot2)
+library(easyanova)
+library(lme4)
+library(agricolae)
+library(openxlsx)
+# reading data
+patogen <- read_excel("patogenicidade.xlsx", 5)
+
+# create new variable for species with genotype
+patogen <- patogen %>%
+ unite(species3, species, genotype, sep="")
+
+# boxplot
+
+
+patogen2 <- patogen %>%
+  filter(exp == 2)%>%
+  group_by(species3, dai)%>%
+  summarize(mean_sev = mean(sev),
+            sd_sev = sd(sev)
+            )
+
+
+
+
+patogen2 %>%
+  ggplot(aes(dai, mean_sev, shape=species3))+
+  geom_point()+
+    geom_line(aes(shape=species3, linetype=species3))+
+  theme_minimal()+
+ theme(legend.position=c(0.1, 0.86))+
+ scale_color_grey()+
+  labs(y = "Severity (%)", x = "Days after inoculation")+
+ ggsave("dpc_base.png", width=5, height=5)
+
+
+
+# formato longo para largo
+
+dat_audpc <- patogen %>%
+  select(exp, isolate, species3, dai, spike, sev)%>%
+    mutate(row = 1:nrow(patogen))%>%
+  filter(exp ==2 )%>%
+  group_by(isolate, species3, dai,spike)%>%
+  filter(spike < 6)%>%
+  summarize(mean_sev = mean(sev))%>%
+  spread(key = dai, value = mean_sev)
+
+write.xlsx(dat_audpc, "aupdc.xlsx")
+
+
+# importa o arquivo com audpc
+
+audpc2 <- read_excel("aupdc2.xlsx")
+
+audpc2 %>%
+   select(isolate, AUPDC) %>% 
+  ea1(design=1, plot=3)
+
+
+
+# glmm
+glmm_audpc <- lmer(AUPDC ~ species3 + (1 | isolate), data=audpc2, REML=FALSE)
+summary(glmm_audpc)
+library(car)
+Anova(glmm_audpc)
+library(lattice)
+plot(glmm_audpc,type=c("p","smooth"))
+qqmath(glmm_audpc,id=0.05)
+library(lsmeans)
+medias2 <- lsmeans(glmm_audpc, ~ species3 )
+tab2 <- cld(medias2, by = NULL, Letters = LETTERS, alpha = .05)  

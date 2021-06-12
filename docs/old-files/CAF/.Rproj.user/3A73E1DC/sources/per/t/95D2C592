@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1518213471419.000,
+    "dirty" : true,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "95D2C592",
+    "lastKnownWriteTime" : 1518213443,
+    "last_content_update" : 1518213495550,
+    "path" : "~/Documents/differences-in-mean/no_lapply.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "56,6",
+        "scrollLine" : "55"
+    },
+    "relative_order" : 44,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

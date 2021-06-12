@@ -1,0 +1,11 @@
+"0","var_prod <- dat %>% "
+"0","  group_by(LOCAL, YEAR) %>%  "
+"0","  select(NOMETRAT, REP, PROD) %>% "
+"0","  group_by(LOCAL, YEAR) %>% "
+"0","  do(tidy(aov(.$PROD ~ .$NOMETRAT + factor(.$REP)))) %>% "
+"0","  filter(term == ""Residuals"") %>% "
+"0","  unite(LOCAL_YEAR, LOCAL, YEAR, sep = ""_"", remove = F) %>% "
+"0","  ungroup() %>% "
+"0","  select(1:3, 7)"
+"2","Adding missing grouping variables: `LOCAL`, `YEAR`
+"

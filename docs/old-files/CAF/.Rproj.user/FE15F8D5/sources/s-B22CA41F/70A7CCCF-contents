@@ -1,0 +1,532 @@
+---
+title: "Análise Estatística Experimentos Ensaio em Rede de Giberela 2014 e 2015"
+author: ""
+date: "June 17, 2016"
+output:
+  pdf_document: default
+  html_document:
+    number_sections: yes
+    theme: united
+---
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+library(readxl)
+library(magrittr)
+library(dplyr)
+library(easyanova)
+library(tidyr)
+library(knitr)
+library(ggplot2)
+```
+
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+# carrega os dados
+gib1 <- read_excel("dados-gib.xlsx") 
+```
+
+# Apresentação
+
+Para cada ensaio, foi aplicado um modelo de Anova para delineamento em blocos casualizados, usando o pacote `easyanova`. As premissas de normalidade e homocedasticidade dos resíduos foram verificadas aplicando-se o modelo aos dados originais. No caso de heterocedasticidade significativa, os dados foram transformados (log, sqrt, etc). No caso de rejeição da hipótese nula, as médias dos tratamentos foram comparadas pelo teste de Tukey a 5% de probabilidade. 
+
+
+# Ensaio 1 - Água Santa 2014
+
+## Produtividade
+ 
+```{r, eval=FALSE, include=FALSE}
+anova_gib1 <- gib1 %>%
+ group_by(ensaio) %>%
+  select(1, 9, 8, 18)%>%
+  group_by(ensaio)%>%
+ do(ea1(.[-1], design=2))
+```
+
+
+### Anova
+```{r, include=FALSE}
+ ensaio1 <- filter(gib1, ensaio ==1)%>%
+ select(9, 8, 18)%>%
+ mutate(prod2 = prod)%>%
+ select(-prod)%>%
+ ea1(., design=2, plot=3)
+ 
+```
+
+### Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==1) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+
+```
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio1$`Residual analysis`[1:6,]))
+```
+
+### Teste de comparação de médias
+
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+ table_ensaio1 <- data.frame(ensaio1$`Adjusted means`[c(1,2,4)])
+ table_ensaio1 <- rename(table_ensaio1, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio1$Mean <- round(table_ensaio1$Mean, 3)
+ table_ensaio1 <- unite(table_ensaio1, Means, Mean, tukey,  sep = "")
+kable(table_ensaio1)
+```
+
+
+
+
+# Ensaio 2 - Cruz Alta 2014
+ 
+## Produtividade
+
+### Anova
+```{r, include=FALSE}
+ ensaio2 <- filter(gib1, ensaio ==2)%>%
+ select(9, 8, 18)%>%
+ ea1(., design=2, plot=3)
+ 
+```
+
+### Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==2) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+
+```
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio2$`Residual analysis`[1:3,]))
+```
+
+## Teste de comparação de médias
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ table_ensaio2 <- data.frame(ensaio2$`Adjusted means`[c(1,2,4)])
+ table_ensaio2 <- rename(table_ensaio2, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio2$Mean <- round(table_ensaio2$Mean, 3)
+ table_ensaio2 <- unite(table_ensaio2, Means, Mean, tukey,  sep = "")
+kable(table_ensaio2)
+```
+
+# Ensaio 3 - Giruá 2014
+ 
+## Produtividade
+
+### Anova
+```{r, include=FALSE}
+ ensaio3 <- filter(gib1, ensaio ==3)%>%
+ select(9, 8, 18)%>%
+ ea1(., design=2, plot=3)
+ 
+```
+
+
+### Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==3) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+```
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio3$`Residual analysis`[1:3,]))
+```
+
+### Teste de comparação de médias
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+ table_ensaio3 <- data.frame(ensaio3$`Adjusted means`[c(1,2,4)])
+ table_ensaio3 <- rename(table_ensaio3, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio3$Mean <- round(table_ensaio3$Mean, 3)
+ table_ensaio3 <- unite(table_ensaio3, Means, Mean, tukey,  sep = "")
+kable(table_ensaio3)
+```
+
+# Ensaio 4 - Guarapuava 2014
+ 
+## Produtividade
+
+### Anova
+```{r, include=FALSE}
+ ensaio4 <- filter(gib1, ensaio ==4)%>%
+ select(9, 8, 18)%>%
+ ea1(., design=2, plot=3)
+ 
+```
+
+### Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==4) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+
+```
+
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio4$`Residual analysis`[1:3,]))
+```
+
+### Teste de comparação de médias
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+ table_ensaio4 <- data.frame(ensaio4$`Adjusted means`[c(1,2,4)])
+ table_ensaio4 <- rename(table_ensaio4, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio4$Mean <- round(table_ensaio4$Mean, 3)
+ table_ensaio4 <- unite(table_ensaio4, Means, Mean, tukey,  sep = "")
+kable(table_ensaio4)
+```
+
+
+# Ensaio 5 - Londrina 2014
+
+## Produtividade
+
+### Anova
+```{r, include=FALSE}
+ ensaio5 <- filter(gib1, ensaio ==5)%>%
+ select(9, 8, 18)%>%
+ ea1(., design=2, plot=3)
+```
+
+ 
+### Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==5) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+```
+
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio5$`Residual analysis`[1:3,]))
+```
+
+### Teste de comparação de médias
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ table_ensaio5 <- data.frame(ensaio5$`Adjusted means`[c(1,2,4)])
+ table_ensaio5 <- rename(table_ensaio5, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio5$Mean <- round(table_ensaio5$Mean, 3)
+ table_ensaio5 <- unite(table_ensaio5, Means, Mean, tukey,  sep = "")
+kable(table_ensaio5)
+```
+
+
+
+
+# Ensaio 6 - Palmeira 2014
+
+## Produtividade
+
+### Anova
+```{r, include=FALSE}
+ ensaio6 <- filter(gib1, ensaio ==6)%>%
+ select(9, 8, 18)%>%
+ ea1(., design=2, plot=3)
+```
+
+
+### Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==6) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+```
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio6$`Residual analysis`[1:3,]))
+```
+
+### Teste de comparação de médias
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ table_ensaio6 <- data.frame(ensaio6$`Adjusted means`[c(1,2,4)])
+ table_ensaio6 <- rename(table_ensaio6, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio6$Mean <- round(table_ensaio6$Mean, 3)
+ table_ensaio6 <- unite(table_ensaio6, Means, Mean, tukey,  sep = "")
+kable(table_ensaio6)
+```
+
+
+
+# Ensaio 7 - Passo Fundo 1 2014
+
+## Produtividade 
+ 
+### Anova
+```{r, include=FALSE}
+ ensaio7 <- filter(gib1, ensaio ==7)%>%
+ select(9, 8, 18)%>%
+ ea1(., design=2, plot=3)
+```
+
+### Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==7) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+```
+
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio7$`Residual analysis`[1:3,]))
+```
+
+### Teste de comparação de médias
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ table_ensaio7 <- data.frame(ensaio7$`Adjusted means`[c(1,2,4)])
+ table_ensaio7 <- rename(table_ensaio7, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio7$Mean <- round(table_ensaio7$Mean, 3)
+ table_ensaio7 <- unite(table_ensaio7, Means, Mean, tukey,  sep = "")
+kable(table_ensaio7)
+```
+
+
+
+# Ensaio 8 - Passo Fundo 2014
+
+## Produtividade 
+ 
+### Anova
+```{r, include=FALSE}
+ ensaio8 <- filter(gib1, ensaio ==8)%>%
+ select(9, 8, 18)%>%
+ ea1(., design=2, plot=3)
+```
+
+### Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==8) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+```
+
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio8$`Residual analysis`[1:3,]))
+```
+
+### Teste de comparação de médias
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ table_ensaio8 <- data.frame(ensaio8$`Adjusted means`[c(1,2,4)])
+ table_ensaio8 <- rename(table_ensaio8, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio8$Mean <- round(table_ensaio8$Mean, 3)
+ table_ensaio8 <- unite(table_ensaio8, Means, Mean, tukey,  sep = "")
+kable(table_ensaio8)
+```
+
+
+# Ensaio 9 - Ponta Grossa 2014
+
+## Produtividade 
+ 
+### Anova
+```{r, include=FALSE}
+  ensaio9 <- filter(gib1, ensaio ==9)%>%
+ select(9, 8, 18)%>%
+ ea1(., design=2, plot=3)
+```
+
+## Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==9) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+```
+
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio9$`Residual analysis`[1:3,]))
+```
+
+### Teste de comparação de médias
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ table_ensaio9 <- data.frame(ensaio9$`Adjusted means`[c(1,2,4)])
+ table_ensaio9 <- rename(table_ensaio9, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio9$Mean <- round(table_ensaio9$Mean, 3)
+ table_ensaio9 <- unite(table_ensaio9, Means, Mean, tukey,  sep = "")
+kable(table_ensaio9)
+```
+
+
+# Ensaio 10 - Cruz Alta 2015
+ 
+## Produtividade
+ 
+### Anova
+```{r, include=FALSE}
+ ensaio10 <- filter(gib1, ensaio ==10)%>%
+ select(9, 8, 18)%>%
+ mutate(prod2 = prod)%>%
+ select(-prod)%>%
+ ea1(., design=2, plot=3) 
+```
+
+## Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==10) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+```
+
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio10$`Residual analysis`[1:3,]))
+```
+
+### Teste de comparação de médias
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ table_ensaio10 <- data.frame(ensaio10$`Adjusted means`[c(1,2,4)])
+ table_ensaio10 <- rename(table_ensaio10, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio10$Mean <- round(table_ensaio10$Mean, 3)
+ table_ensaio10 <- unite(table_ensaio10, Means, Mean, tukey,  sep = "")
+kable(table_ensaio10)
+```
+
+
+
+
+# Ensaio 11 - Guarapuava 2015
+
+## Produtividade 
+ 
+### Anova
+```{r, include=FALSE}
+  ensaio11 <- filter(gib1, ensaio ==11)%>%
+ select(9, 8, 18)%>%
+ ea1(., design=2, plot=3)
+```
+
+
+### Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==11) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+```
+
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio11$`Residual analysis`[1:3,]))
+```
+
+### Teste de comparação de médias
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ table_ensaio11 <- data.frame(ensaio11$`Adjusted means`[c(1,2,4)])
+ table_ensaio11 <- rename(table_ensaio11, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio11$Mean <- round(table_ensaio11$Mean, 3)
+ table_ensaio11 <- unite(table_ensaio11, Means, Mean, tukey,  sep = "")
+kable(table_ensaio11)
+```
+
+
+
+# Ensaio 12 - Palmeira 2015
+ 
+## Produtividade
+ 
+### Anova
+```{r, include=FALSE}
+ ensaio12 <- filter(gib1, ensaio ==12)%>%
+ select(9, 8, 18)%>%
+ ea1(., design=2, plot=3)
+```
+
+### Boxplots
+
+```{r, echo=FALSE}
+filter(gib1, ensaio ==12) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))+
+ coord_flip()
+```
+
+
+### Análise de resíduos
+```{r, echo=FALSE}
+kable(data.frame(ensaio12$`Residual analysis`[1:3,]))
+```
+
+### Teste de comparação de médias
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ table_ensaio12 <- data.frame(ensaio12$`Adjusted means`[c(1,2,4)])
+ table_ensaio12 <- rename(table_ensaio12, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio12$Mean <- round(table_ensaio12$Mean, 3)
+ table_ensaio12 <- unite(table_ensaio12, Means, Mean, tukey,  sep = "")
+kable(table_ensaio12)
+```
+
+
+
+# Ensaio 13 - Passo Fundo 2015
+ 
+## Produtividade 
+ 
+### Anova
+```{r, eval=FALSE, include=FALSE}
+ ensaio13 <- filter(gib1, ensaio ==13)%>%
+ select(9, 8, 18)%>%
+ ea1(., design=2, plot=3)
+
+```
+
+### Boxplots
+
+```{r, eval=FALSE, include=FALSE}
+filter(gib1, ensaio ==13) %>%
+ggplot(aes(trat, prod))+ geom_boxplot()+
+ theme(axis.text.x=element_text(angle = 90, vjust = 0))
+```
+
+
+### Análise de resíduos
+```{r, eval=FALSE, include=FALSE}
+kable(data.frame(ensaio13$`Residual analysis`[1:3,]))
+```
+
+### Teste de comparação de médias
+```{r, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+ table_ensaio13 <- data.frame(ensaio13$`Adjusted means`[c(1,2,4)])
+ table_ensaio13 <- rename(table_ensaio13, Treatment = treatment, Mean = adjusted.mean)
+ table_ensaio13$Mean <- round(table_ensaio13$Mean, 1)
+ table_ensaio13 <- unite(table_ensaio13, Means, Mean, tukey,  sep = "")
+kable(table_ensaio13)
+```

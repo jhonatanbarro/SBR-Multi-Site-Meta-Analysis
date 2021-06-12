@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1518126793137.000,
+    "dirty" : true,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "9A7BA25D",
+    "lastKnownWriteTime" : 1518127402,
+    "last_content_update" : 1518127441844,
+    "path" : "~/Documents/shiny-examples/063-superzip-example/server.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "86,57",
+        "scrollLine" : "77"
+    },
+    "relative_order" : 14,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

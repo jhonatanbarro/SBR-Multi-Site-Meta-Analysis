@@ -1,0 +1,157 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+# carrega pacotes
+library(readxl)
+library(tidyverse)
+library (ggplot2)
+library (ggthemes)
+library(cowplot)
+library(broom)
+
+```
+
+# Importa conjunto de dados
+
+```{r}
+dat1 <- read.table("cm.csv", h = T, sep = ";")
+  
+  
+head(dat1)
+str(dat1)
+
+```
+
+# Plot dados por fungicida
+
+```{r}
+#visualiza a tendencia dos dados de crecimento micelial
+ggplot(dat1, aes(dose, cm, colour=isolado))+
+  geom_smooth(stat="summary", fun.y="mean", se = F, size = 0.5)+
+  geom_point(alpha = 1/2, position = position_jitter(w = 0.1, h=0.1), size=3)+
+  facet_wrap(~ fungicide, ncol=5)+ 
+  theme_cowplot()+ 
+  background_grid(major = "xy", size.major = 0.5, size.minor = 0.5) +
+  theme(legend.position="none")+
+  labs(x = (expression(paste('Doses de Tebuconazol', ' (', mu,'g/ml)'))), y = "Crescimento micelial (mm)")+
+  ggsave("ec-by-fungicide.png", width=8, height=5, dpi=300)
+
+```
+
+# Plot dados por isolado
+
+```{r}
+#visualiza a tendencia dos dados de crecimento micelial
+ggplot(dat1, aes(dose, cm, colour=fungicide))+
+  geom_smooth(stat="summary", fun.y="mean", se = F, size = 0.5)+
+  geom_point(alpha = 1/2, position = position_jitter(w = 0.1, h=0.1), size=3)+
+  facet_wrap(~ isolado, ncol=6)+ 
+  theme_cowplot()+
+  background_grid(major = "xy", size.major = 0.5, size.minor = 0.5) +
+  theme(legend.position="top")+
+  labs(x = (expression(paste('Doses', ' (', mu,'g/ml)'))), y = "Micelial growth (mm)", colour = "Fungicide")+
+  ggsave("ec-by-isolate.png", width=8, height=8, dpi=300)
+
+```
+
+# Plot dados linearizados por isolado
+
+```{r}
+#visualiza a tendencia dos dados de crecimento micelial
+dat1 %>% filter(dose != "0") %>% ggplot(aes(log(dose), inibicao, colour = fungicide) )+
+  geom_smooth(method="lm", fullrange = TRUE, se = T, size = 0.5)+
+  geom_point(alpha = 1/2, size=3)+
+  facet_wrap(~ isolado, ncol=6)+ 
+  theme_cowplot()+
+  background_grid(major = "xy", size.major = 0.5, size.minor = 0.5) +
+  theme(legend.position="top")+
+  labs(x = (expression(paste('Log(doses)', ' (', mu,'g/ml)'))), y = "Micelial growth (mm)", colour = "Fungicide")+
+  ggsave("ec-linear-by-isolate.png", width=8, height=8, dpi=300)
+
+```
+
+
+# Calcula EC50
+
+```{r}
+# ajusta a regressao linear para todos os isolados (inibicao germ ~ log(dose)) e estima o valor de EC50 
+
+ec <- dat1 %>% filter(dose != "0") %>%  
+  group_by(ano, isolado, fungicide, genotipo) %>% 
+  do(tidy(lm(.$inibicao ~ log(.$dose)))) %>% 
+  select(ano, isolado, fungicide, genotipo, term, estimate) %>% 
+  group_by(ano, isolado, fungicide) %>% 
+  spread(term, estimate) %>% 
+  setNames( c("ano", "isolado", "fungicide", "genotipo", "intercept", "slope")) %>% 
+  mutate(ec50 = exp((50 - intercept)/slope))
+  
+
+
+```
+
+# Histograma dos valores de EC50
+
+```{r}
+hist <- ec %>%  
+  ggplot(aes(x = ec50)) +
+  geom_histogram(fill=I("white"), col=I("black")) +
+  facet_wrap(~ fungicide, ncol=2, scales= "free")+
+  labs(x = (expression(paste('EC'[50], ' (', mu,'g/ml)'))), y = "Number of isolates")+
+  theme_cowplot()+
+  ggsave("hist.png",width=5, height=3, dpi=300)
+
+
+```
+
+# Boxplot por fungicida
+
+```{r}
+ec %>% ggplot(aes(fungicide, ec50)) + 
+  geom_boxplot(outlier.shape = NA)+ geom_point()+
+  theme_cowplot(font_size=12)+
+  background_grid(major = "xy")+
+  #facet_grid (~ fungicida)+
+  #facet_wrap(~ fungicida, ncol=2, scales="fixed") +
+  #geom_jitter()+
+  labs(y = expression('EC'[50](µg/ml)), x = "")+
+  #scale_y_continuous(breaks=c(0, 0.5, 1.0,  1.5,  2.0, 2.5, 3.0))+
+  #scale_x_discrete(breaks=NULL)+
+  ggsave("boxggplot.png", width=8, height=6, dpi=300)
+
+```
+
+# Density plot
+
+```{r}
+library(ggjoy)
+
+plot_ec <- ec %>%  
+  ggplot(aes(x = ec50, fungicide)) +
+  geom_joy(alpha = 0.8) +
+  geom_jitter(alpha=0.7, height = 0.08, size = 1.5,  aes(colour = genotipo))+
+  scale_y_discrete(expand = c(0.01, 0.15)) +  
+  scale_x_continuous(expand = c(0, 0))+ 
+  #xlim(c(0, 4))+
+  theme_joy()+
+  scale_colour_hue(breaks=c("15ADON", "3ADON", "NIV", "XXX"),
+    labels=c("15ADON", "3ADON", "NIV", "Failed"))+
+  theme(
+    #legend.title=element_text(size=10, face = "bold"),
+    #legend.text=element_text(size=9),
+    #legend.margin = margin(6, 6, 6, 6),
+       #axis.text = element_text(size=12),
+       legend.position = c(1, 1.05),
+       legend.justification = c("right", "top"),
+       #plot.margin = unit(c(2,0,0,0), "lines"),
+       axis.title.x = element_text(hjust=0.5))+
+  labs(x = (expression(paste('EC'[50], ' (', mu,'g/ml)'))), y = "", color = "Genotype")+
+  ggsave("density2.png",width=5, height=3, dpi=600)
+
+
+```
+

@@ -1,0 +1,3 @@
+"0","caf <- left_join(prod, var_prod)"
+"2","Joining, by = c(""LOCAL_YEAR"", ""LOCAL"", ""YEAR"")
+"

@@ -1,0 +1,402 @@
+---
+title: "FHB - sev"
+author: "Franklin Machado"
+date: "6 de fevereiro de 2017"
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r, warning=FALSE, include=FALSE}
+library(readxl)
+library(plyr)
+library(dplyr)
+library(magrittr)
+library(ggplot2)
+library(metafor)
+library(knitr)
+library(ggplot2)
+library(ggthemes)
+library(cowplot)
+library(scales)
+```
+
+# Para o C (eficácia de controle)
+
+## Cria o dataset
+
+```{r, warning=FALSE}
+# import data
+fhb_sev <- read_excel("data_sev.xlsx", 1)
+tail(fhb_sev)
+head(fhb_sev)
+
+
+# check structure
+glimpse(fhb_sev)
+
+# generate a new dataset with fewer selected variables and eliminate rows with NA values 
+
+fhb <- fhb_sev %>% group_by(trial) %>% select(study, trial, year, cultivar, reaction, location, state, n, AI, group, n_spray, n_spray2, yield_check, sev_check, sev, V_sev, publication,mean_trial, cons_group) %>% filter(sev != "NA")
+
+glimpse(fhb)
+
+fhb$sev<-as.numeric(fhb$sev)
+fhb$sev_check<-as.numeric(fhb$sev_check)
+fhb$V_sev<-as.numeric(fhb$V_sev)
+fhb$yield_check<-as.numeric(fhb$yield_check)
+
+# Number of unique trials
+length(unique(fhb$trial))
+
+# Number of unique study
+length(unique(fhb$study))
+
+#filter the select fungicides
+fhb_check <- fhb %>% group_by(trial) %>% filter (AI == "Check") 
+fhb_teb <- fhb %>% group_by(trial) %>% filter (AI == "Tebuconazole") 
+fhb_prop <- fhb %>% group_by(trial) %>% filter (AI == "Propiconazole") 
+fhb_carb <- fhb %>% group_by(trial) %>% filter (AI == "Carbendazim") 
+
+fhb_a <- rbind(fhb_check, fhb_teb, fhb_prop, fhb_carb)
+
+
+fhb_a$AI <- revalue(fhb_a$AI, c("Check" = "AACHECK")) 
+fhb_a$AI <-revalue(fhb_a$AI, c("Tebuconazole" = "TEBU"))
+fhb_a$AI <-revalue(fhb_a$AI, c("Propiconazole" = "PROP"))
+fhb_a$AI <-revalue(fhb_a$AI, c("Carbendazim" = "CARB"))
+
+fhb_a <- fhb_a %>% group_by(trial) %>% arrange (trial, AI)
+
+fhb_a2 <- fhb_a %>% 
+  filter(n_spray < 3) %>% 
+  filter(state != "Uruguai") %>% 
+  filter(trial, length(trial)>1) 
+
+
+```
+
+
+
+## Cria variáveis para M-A
+
+
+
+```{r}
+# Sampling variance for log of the mean (Paul et al., 2008) to use in multivariate model
+fhb_a2$L.var_sev2 <- with(fhb_a2, V_sev / (n * sev^2))
+
+# Preparing the variables: yi is the effect size and vi is the sampling variance
+fhb_a2$yi <- log(fhb_a2$sev)
+fhb_a2$vi <- fhb_a2$L.var_sev2
+fhb_a2$id <- 1:nrow(fhb_a2)
+
+
+### Para todos AI
+
+
+# Number of entries by fungicide and number of sprays
+kable(table(fhb_a2$AI, fhb_a2$n_spray2), format="pandoc")
+
+fhb_a2 <- fhb_a2 %>% mutate(AI_nspray2 = paste(AI, n_spray2,sep='_')) %>% filter(AI_nspray2 != "CARB_1") %>% filter(trial, length(trial)>1) 
+
+
+table(fhb_a2$AI_nspray2)
+
+#boxplot(fhb_a2$sev~fhb_a2$AI_nspray2)
+
+```
+
+## Descritiva
+
+```{r, echo=FALSE}
+# Number of unique trials
+length(unique(fhb_a2$trial))
+
+# Number of unique study
+length(unique(fhb_a2$study))
+
+# Summary for AI_nspray2 
+fhb_check <- fhb_a2 %>% group_by(trial) %>% filter (AI_nspray2 == "AACHECK_0")
+nrow(table(fhb_check$trial))
+summary(fhb_check$sev_check)
+
+fhbmaior30 <- fhb_a2 %>%
+  filter(sev_check > 30) 
+length(unique(fhbmaior30$trial))
+
+
+#tabela_geral_sev <- fhb_a2 %>% select (study, trial, year, location, AI_nspray2, state, cultivar, reaction, sev_check, yield_check)
+#write.csv(tabela_geral_sev, "data_network_sev.csv")
+
+
+### CV para sev
+
+## All entries
+cv <- (sd(fhb_a2$sev)/mean(fhb_a2$sev))*100
+cv
+
+## For control
+cv <- (sd(fhb_check$sev_check)/mean(fhb_check$sev_check))*100
+cv
+
+
+
+fhb_carb <- fhb_a2 %>% group_by(trial) %>% filter (AI_nspray2 == "CARB_2")
+summary(fhb_carb$sev)
+nrow(data.frame(table(fhb_carb$trial)))
+
+fhb_prop <- fhb_a2 %>% group_by(trial) %>% filter (AI_nspray2 == "PROP_2")
+summary(fhb_prop$sev)
+nrow(data.frame(table(fhb_prop$trial)))
+
+fhb_teb1 <- fhb_a2 %>% group_by(trial) %>% filter (AI_nspray2 == "TEBU_1")
+summary(fhb_teb1$sev)
+nrow(data.frame(table(fhb_teb1$trial)))
+
+fhb_teb2 <- fhb_a2 %>% group_by(trial) %>% filter (AI_nspray2 == "TEBU_2")
+summary(fhb_teb2$sev)
+nrow(data.frame(table(fhb_teb2$trial)))
+
+#write.csv(fhb_a2, "network_sev.csv")
+
+
+```
+
+## M-A
+
+### AI
+
+```{r}
+### Por AI
+
+fhb_mv_AI <- rma.mv(yi, vi, mods = ~ AI_nspray2, method="ML",random = list(~ AI_nspray2 | trial, ~1 | id), struct="UN", data=fhb_a2)
+
+summary(fhb_mv_AI)
+
+
+results_AI <- data.frame(cbind((1-exp(fhb_mv_AI$b))*100, 
+                              (1-exp(fhb_mv_AI$ci.lb))*100,
+                              (1-exp(fhb_mv_AI$ci.ub))*100))
+results_AI
+
+
+anova(fhb_mv_AI, L=rbind(c(0,1,-1,0,0), 
+                         c(0,0,-1,1,0),
+                         c(0,0,-1,0,1),
+                         c(0,0,0,-1,1)))  
+
+
+```
+
+### Cultivar
+
+```{r}
+
+#cria dois grupos de cultivares
+table(fhb_a2$cultivar, fhb_a2$reaction)
+nrow(table(fhb_a2$cultivar, fhb_a2$reaction))
+
+
+fhb_a2$reaction <- revalue(fhb_a2$reaction, c("MS" = "S"))
+fhb_a2$reaction <- revalue(fhb_a2$reaction, c("MS/MR" = "MR"))
+fhb_a2$reaction <- revalue(fhb_a2$reaction, c("MR/R" = "MR"))
+fhb_a2$reaction <- revalue(fhb_a2$reaction, c("MS/S" = "S"))
+
+table(fhb_a2$cultivar, fhb_a2$reaction)
+table(fhb_a2$reaction)
+kable(table(fhb_a2$AI_nspray2, fhb_a2$reaction), format="pandoc")
+
+
+fhb_mv_AI_cult <- rma.mv(yi, vi, mods = ~ AI_nspray2*reaction, method="ML",random =list(~ AI_nspray2 | trial, ~1 | id), struct="UN", data=fhb_a2)
+summary(fhb_mv_AI_cult)
+
+
+anova(fhb_mv_AI_cult, btt=7)
+
+
+```
+
+
+
+### Dis_press
+
+```{r}
+#dis_press
+fhb_a2$dis_press <- ifelse(as.numeric(fhb_a2$sev_check) >7.0, 2, 1)
+
+table(fhb_a2$AI_nspray2, fhb_a2$dis_press)
+
+# Modelo I - com moderadora diss_press
+
+fhb_mv_AI_sev_check <- rma.mv(yi, vi, mods = ~ AI_nspray2*factor(dis_press), method="ML",random = list(~ AI_nspray2 | trial, ~1 | id), struct="UN", data=fhb_a2)
+summary(fhb_mv_AI_sev_check)
+
+anova(fhb_mv_AI_sev_check,btt=7:10)
+
+
+```
+
+### Sev_check continua
+
+```{r}
+# continua
+fhb_mv_AI_disspress <- rma.mv(yi, vi, mods = ~ AI_nspray2*as.numeric(sev_check), method="ML",random = list(~ AI_nspray2 | trial, ~1 | id), struct="UN", data=fhb_a2)
+summary(fhb_mv_AI_disspress)
+
+
+anova(fhb_mv_AI_disspress, btt = 7:10)
+```
+
+### yield_class
+
+```{r}
+#Moderator yield_class
+
+summary(fhb_a2$yield_check) # Median = 2993; Mean = 2915
+
+
+fhb_a2$yield_class <- ifelse(fhb_a2$yield_check > 3000, 2, 1)
+table(fhb_a2$yield_class, fhb_a2$AI_nspray2)
+
+
+#Model 2
+fhb_mv_AI_yield_class <- rma.mv(yi, vi, mods = ~ AI_nspray2*factor(yield_class), method="ML",random = list(~ AI_nspray2 | trial, ~1 | id), struct="UN", data=fhb_a2)
+summary(fhb_mv_AI_yield_class)
+
+
+
+anova(fhb_mv_AI_yield_class, btt=7:10) 
+
+```
+
+### State
+
+```{r}
+
+
+### Para todos AI_nspray2
+
+# Number of entries by fungicide and state
+kable(table(fhb_a2$AI_nspray2, fhb_a2$state), format="pandoc")
+
+
+fhb_mv_AI_state <- rma.mv(yi, vi, mods = ~ AI_nspray2*factor(state), method="ML",random =list(~ AI_nspray2 | trial, ~1 | id), struct="UN", data=fhb_a2)
+summary(fhb_mv_AI_state)
+
+anova(fhb_mv_AI_state,btt=8:15)
+
+anova(fhb_mv_AI_state,btt=8:11)
+
+anova(fhb_mv_AI_state,btt=11:15)
+
+```
+
+
+### Ano como continua
+
+```{r}
+# Moderator year (continuous)
+# Number of entries by fungicide and year
+kable(table(fhb_a2$AI_nspray2, fhb_a2$year), format="pandoc")
+
+
+fhb_mv_AI_year <- rma.mv(yi, vi, mods = ~ AI_nspray2*as.numeric(year), method="ML",random =list(~ AI_nspray2 | trial, ~1 | id), struct="UN", data=fhb_a2)
+summary(fhb_mv_AI_year)
+
+
+anova(fhb_mv_AI_year, btt=7:10)
+```
+
+## Plots
+
+###Boxplot sev
+
+```{r}
+box_sev_AI2 <- ggplot(fhb_a2, aes(AI_nspray2, sev))+
+  geom_boxplot(size = 0.5, outlier.shape = NA)+ 
+  geom_jitter(width=0.1, shape=1, size=2.5, color="gray50")+
+  scale_x_discrete(labels=c("CHECK","CARB 2x", "PROP 2x" ,"TEBU 1x","TEBU 2x")) +
+  theme_cowplot()+
+  #background_grid(major = "xy", size.major = 0.5, size.minor = 0.5) +
+  xlab("")+
+  ylab("FHB index (%)")+ 
+  theme(axis.text.x=element_blank())
+  scale_y_continuous(breaks=c(0, 10,  20,  30, 40, 50, 60, 70, 80, 90, 100), limits=c(0,100))
+  
+```
+
+## Inconsistency testing
+
+```{r, echo=FALSE}
+ 
+
+# new clean dataset
+
+dat_plot1 <- fhb_a2 %>% group_by(trial) %>% select(trial, year, AI_nspray2) 
+dat_plot2 <- data.frame(table(dat_plot1$trial, dat_plot1$AI_nspray2))
+
+
+dat_plot3 <- reshape(dat_plot2, 
+             timevar = "Var2",
+             idvar = c("Var1"),
+             direction = "wide")
+
+colnames(dat_plot3) <- c("trial", "t1", "t2", "t3", "t4", "t5")
+
+dat_plot3$t1 <- ifelse(dat_plot3$t1 > 0, "CHECK",NA)
+dat_plot3$t2 <- ifelse(dat_plot3$t2 > 0, "CARB 2x",NA)
+dat_plot3$t3 <- ifelse(dat_plot3$t3 > 0, "PROP 2x",NA)
+dat_plot3$t4 <- ifelse(dat_plot3$t4 > 0, "TEBU 1x",NA)
+dat_plot3$t5 <- ifelse(dat_plot3$t5 > 0, "TEBU 2x",NA)
+
+
+dat_plot3 <- as.data.frame(dat_plot3)
+class(dat_plot3)
+
+
+dat_plot3 <- dat_plot3 %>% 
+  mutate(group = paste(t1, t2, t3, t4, t5, sep = ","))
+
+data.frame(table(dat_plot3$group))
+
+
+dat_plot3 %>% filter(group == "CHECK,CARB 2x,NA,NA,NA") #1 .. 65
+dat_plot3 %>% filter(group == "CHECK,CARB 2x,NA,TEBU 1x,TEBU 2x") # 12 .. 46:49,83:90
+dat_plot3 %>% filter(group == "CHECK,CARB 2x,PROP 2x,NA,NA") # 13 .. 32:36,38:43, 45, 91
+dat_plot3 %>% filter(group == "CHECK,CARB 2x,PROP 2x,NA,TEBU 2x") # 8 .. 19:25,61
+dat_plot3 %>% filter(group == "CHECK,NA,NA,NA,TEBU 2x") # 1 .. 53
+dat_plot3 %>% filter(group == "CHECK,NA,NA,TEBU 1x,NA") # 8 .. 3:6,11,16,44,66
+dat_plot3 %>% filter(group == "CHECK,NA,NA,TEBU 1x,TEBU 2x") # 2 .. 1:2
+dat_plot3 %>% filter(group == "CHECK,NA,PROP 2x,NA,NA") # 2 .. 37, 57
+dat_plot3 %>% filter(group == "CHECK,NA,PROP 2x,NA,TEBU 2x") # 6 .. 54:56, 59:60,63
+
+### Alterei grupos no EXCEL
+
+table(fhb_a2$cons_group)
+
+
+### MODELO 
+
+fhb_mv_AI_cons <- rma.mv(yi, vi, mods = ~ AI_nspray2 * cons_group, method="ML",random = ~ AI_nspray2 | trial/cons_group, struct="UN", data=fhb_a2)
+summary(fhb_mv_AI_cons)
+
+
+
+results_I<- data.frame(cbind((exp(fhb_mv_AI$b)-1)*100, 
+                             (exp(fhb_mv_AI$ci.lb)-1)*100,
+                             (exp(fhb_mv_AI$ci.ub)-1)*100))
+
+results_I
+
+anova(fhb_mv_AI_cons, btt=11:20) #p-val = 0.9999
+
+
+
+
+```
+
+  

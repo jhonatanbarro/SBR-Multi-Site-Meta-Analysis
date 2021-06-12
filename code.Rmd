@@ -1,0 +1,522 @@
+% Code
+
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(readxl)
+library(metafor)
+library(broom)
+library(here)
+library(knitr)
+library(kableExtra)
+library(cowplot)
+library(janitor)
+```
+
+
+
+# Meta-analysis
+
+## Yield
+
+
+```{r}
+multi1 <- read_excel(here("data", "dat-yld.xlsx"), 1) 
+
+head(multi1)
+```
+
+
+
+### Meta-analytic model
+
+```{r}
+ma1_multi_site <- rma.mv(yi2, vi2, 
+                      mods = ~AI, 
+                      random = list(~ AI | study, ~1 | id), 
+                      struct = "UN", 
+                      method = "ML", 
+                      control = list(optimizer = "nlm"), 
+                      data = multi1)
+ma1_multi_site
+```
+
+### Contrasts
+
+```{r}
+anova(ma1_multi_site, L = rbind(
+  c(0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, -1),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1)))
+
+```
+
+### Exporting results
+
+```{r}
+yield_res<- data.frame(cbind(ma1_multi_site$b,
+                             ma1_multi_site$ci.lb,
+                             ma1_multi_site$ci.ub)) %>%
+  mutate(fungicide = c("check", "AZOX + BENZ", "AZOX + BENZ + CLOR", "AZOX + BENZ + COPPER", "AZOX + BENZ + MANC", "PICO + CYPR", "PICO + CYPR + CLOR", "PICO + CYPR + COPPER", "PICO + CYPR + MANC","PYRA + FLUX", "PYRA + FLUX + CLOR", "PYRA + FLUX + COPPER", "PYRA + FLUX + MANC")) %>%
+  filter(fungicide != "check")
+
+
+names (yield_res) = c("yld", "yld_lower", "yld_upper", "fungicide")
+
+yield_res
+
+PICO_yld = yield_res %>%
+  mutate(n = seq(1:12)) %>%
+  filter(n == c(5,6,7,8)) %>%
+  summarise(mean = yld - first(yld),
+            lower = yld_lower - first(yld_lower),
+            upper = yld_upper - first(yld_upper)) %>%
+  filter(mean>0) %>%
+  mutate(fungicide = rep("PICO + CYPR", length("mean"))) %>%
+  mutate(multi_site = c("CLOR", "COPPER", "MANC"))
+
+PYRA_yld = yield_res %>%
+  mutate(n = seq(1:12)) %>%
+  filter(n > 8) %>%
+  summarise(mean = yld - first(yld),
+            lower = yld_lower - first(yld_lower),
+            upper = yld_upper - first(yld_upper)) %>%
+  filter(mean>0) %>%
+  mutate(fungicide = rep("PYRA + FLUX", length("mean"))) %>%
+  mutate(multi_site = c("CLOR", "COPPER", "MANC"))
+
+AZOX_yld = yield_res %>%
+  mutate(n = seq(1:12)) %>%
+  filter(n < 5) %>%
+  summarise(mean = yld - first(yld),
+            lower = yld_lower - first(yld_lower),
+            upper = yld_upper - first(yld_upper)) %>%
+  filter(mean>0) %>%
+  mutate(fungicide = rep("AZOX + BENZ", length("mean"))) %>%
+  mutate(multi_site = c("CLOR", "COPPER", "MANC"))
+
+gain_yld = rbind(PICO_yld, PYRA_yld, AZOX_yld)
+gain_yld
+
+openxlsx::write.xlsx(gain_yld, here("data","gain_yld.xlsx"), colNames = TRUE)
+```
+
+### Mod: Baseline Disease 
+
+```{r}
+median(multi1$sev_check)
+  
+multi1 <- multi1 %>%
+ mutate(baseline = case_when(
+      sev_check < 80 ~ "Low",
+      sev_check >= 80 ~ "High"))
+
+multi1 %>% 
+  group_by(study,baseline, AI) %>% 
+  summarise() %>% 
+  tabyl(AI, baseline)
+
+multi1 %>% 
+  group_by(study,baseline) %>% 
+  summarise() %>% 
+  tabyl(baseline)
+
+
+ms_baseline <- rma.mv(yi2, vi2, 
+                      mods = ~AI*as.factor(baseline), 
+                      random = list(~ AI | study, ~1 | id), 
+                      struct = "UN", 
+                      method = "ML", 
+                      control = list(optimizer = "nlm"), 
+                      data = multi1)
+
+ms_baseline
+
+anova(ms_baseline, btt=15:26)
+```
+
+#### Mod effect
+
+```{r}
+reg1 = data.frame(ms_baseline$beta, ms_baseline$ci.lb, ms_baseline$ci.ub) %>%
+  rownames_to_column("trat") %>%
+  separate(trat, into = c("lado1", "lado2"), sep = ":") %>%
+  separate(lado2, into = c("lado3","lixo"),sep = "[[)]]" ) %>% 
+  select(-lixo) %>%
+  separate(lado3, into = c("lixo","lado4"),sep = "baseline") %>%
+  select(-lixo) %>%
+  separate(lado1, into = c("lixo","lado1"),sep = "AI" ) %>%
+  select(-lixo) %>%
+  filter(lado1 != "NA") %>% 
+  set_names("fungicide", "class", "mean", "ci.lb", "ci.ub") %>%
+  mutate(class = c(rep("high", 12), rep("low", 12)))
+  
+
+mean = reg1 %>% 
+  group_by(fungicide) %>% 
+  select(1:3) %>% 
+  spread(class, mean) %>% 
+  mutate(mean = (high + low)) %>% 
+  select(1,4)
+
+lower = reg1%>% 
+  group_by(fungicide) %>% 
+  select(1,2,4) %>% 
+  spread(class, ci.lb) %>% 
+  mutate(lower = (high + low)) %>% 
+  select(1,4)
+
+upper = reg1%>% 
+  group_by(fungicide) %>% 
+  select(1,2,5) %>% 
+  spread(class, ci.ub) %>% 
+  mutate(upper = (high + low)) %>% 
+  select(1,4)
+
+reg3 = left_join(mean, lower, by= c("fungicide")) %>% 
+  left_join( upper, by = c("fungicide")) %>% 
+  mutate(class = rep("low", length("fungicide"))) %>% 
+  select("fungicide", "class", "mean", "lower", "upper")
+
+
+high = reg1 %>% 
+  filter(class == "high") %>% 
+  set_names("fungicide", "class", "mean", "lower", "upper")
+
+
+yld_baseline = rbind(high,reg3)
+yld_baseline
+
+openxlsx::write.xlsx(yld_baseline, here("data","yld_baseline_results.xlsx"), colNames = TRUE)
+
+```
+
+
+### Mod: Region 
+
+```{r}
+multi1 = multi1 %>% 
+mutate(region = case_when(
+    state == "MT" ~ "North",
+    state == "BA" ~ "North",
+    state == "MS" ~ "North",
+    state == "GO" ~ "North",
+    state == "PR" ~ "South",
+    state == "MG" ~ "North",
+    state == "SP" ~ "South",
+    state == "RS" ~ "South")) 
+
+multi1 %>%
+  group_by(study,region, AI) %>% 
+  summarise() %>% 
+  tabyl(AI,region)
+
+ma1_region_yld <- rma.mv(yi2, vi2, 
+                      mods = ~AI * as.factor(region), 
+                      random = list(~ AI | study, ~1 | id), 
+                      struct = "UN", 
+                      method = "ML", 
+                      control = list(optimizer = "nlm"), 
+                      data = multi1)
+ma1_region_yld
+
+anova(ma1_region_yld, btt=15:26)
+```
+
+### Inconsistency
+
+We used a factorial-type ANOVA model to determine the significance of the *treatment x design* interaction, evaluated based on the Wald test statistic.
+
+```{r}
+yld_design <- read_excel(here("data", "yld_design.xlsx"), 1) 
+
+mv_yld_design <- rma.mv(yi2, vi2, 
+                      mods = ~AI * design,
+                      random = list(~ 1 | study / design / AI),
+                      struct = "UN", 
+                      method = "ML", 
+                      control = list(optimizer = "nlm"), 
+                      data = yld_design)
+
+mv_yld_design
+
+anova(mv_yld_design,  btt=15:26)
+```
+
+
+
+## Efficacy
+
+
+```{r}
+multi2 <- read_excel(here("data", "dat-sev.xlsx"), 1) 
+
+head(multi2)
+```
+
+### Meta-analytic model
+
+
+```{r}
+ma2_multi_site <- rma.mv(yi, vi, 
+                      mods = ~AI, 
+                      random = list(~ AI | study, ~1 | id), 
+                      struct = "UN", 
+                      method = "ML", 
+                      control = list(optimizer = "nlm"), 
+                      data = multi2)
+
+ma2_multi_site
+
+  
+```
+
+### Contrasts
+
+```{r}
+
+
+anova(ma2_multi_site, L = rbind(
+  c(0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 1, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, -1),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1)))
+
+
+```
+
+```{r}
+efficacy = data.frame(
+  estimate = round((1 - exp(ma2_multi_site$b)) * 100, 2),
+  ci.lb = round((1 - exp(ma2_multi_site$ci.ub)) * 100, 2),
+  ci.ub = round((1 - exp(ma2_multi_site$ci.lb)) * 100, 2)) %>%
+  filter(estimate > 0) %>%
+  mutate(fungicide = c( "AZOX + BENZ", "AZOX + BENZ + CLOR", "AZOX + BENZ + COPPER", "AZOX + BENZ + MANC", "PICO + CYPR", "PICO + CYPR + CLOR", "PICO + CYPR + COPPER", "PICO + CYPR + MANC","PYRA + FLUX", "PYRA + FLUX + CLOR", "PYRA + FLUX + COPPER", "PYRA + FLUX + MANC"))
+
+names (efficacy) = c("efficacy", "eff_lower", "eff_upper", "fungicide")
+efficacy
+```
+
+
+### Exporting results
+
+```{r}
+
+PICO_eff = efficacy %>%
+  mutate(n = seq(1:12)) %>%
+  filter(n == c(5,6,7,8)) %>%
+  summarise(mean_eff = efficacy - first(efficacy),
+            upper_eff = eff_lower - first(eff_lower),
+            lower_eff = eff_upper - first(eff_upper)) %>%
+  filter(mean_eff>0) %>%
+  mutate(fungicide = rep("PICO + CYPR", length("mean_eff"))) %>%
+  mutate(multi_site = c("CLOR", "COPPER", "MANC"))
+
+PYRA_eff = efficacy %>%
+  mutate(n = seq(1:12)) %>%
+  filter(n > 8) %>%
+  summarise(mean_eff = efficacy - first(efficacy),
+            upper_eff = eff_lower - first(eff_lower),
+            lower_eff = eff_upper - first(eff_upper)) %>%
+  filter(mean_eff>0) %>%
+  mutate(fungicide = rep("PYRA + FLUX", length("mean_eff"))) %>%
+  mutate(multi_site = c("CLOR", "COPPER", "MANC"))
+
+AZOX_eff = efficacy %>%
+  mutate(n = seq(1:12)) %>%
+  filter(n < 5) %>%
+  summarise(mean_eff = efficacy - first(efficacy),
+            upper_eff = eff_lower - first(eff_lower),
+            lower_eff = eff_upper - first(eff_upper)) %>%
+  filter(mean_eff>0) %>%
+  mutate(fungicide = rep("AZOX + BENZ", length("mean_eff"))) %>%
+  mutate(multi_site = c("CLOR", "COPPER", "MANC"))
+
+gain_efficacy = rbind(PICO_eff, PYRA_eff, AZOX_eff)
+gain_efficacy
+
+openxlsx::write.xlsx(gain_efficacy, here("data","gain_efficacy.xlsx"), colNames = TRUE)
+```
+
+
+### Mod: Baseline Disease 
+
+```{r}
+median(multi2$sev_check)
+  
+multi2 <- multi2 %>%
+ mutate(baseline = case_when(
+      sev_check < 80 ~ "Low",
+      sev_check >= 80 ~ "High"))
+
+multi2 %>% 
+  group_by(study,baseline, AI) %>% 
+  summarise() %>% 
+  tabyl(AI,baseline)
+
+multi2 %>% 
+  group_by(study,baseline) %>% 
+  summarise() %>% 
+  tabyl(baseline)
+
+
+ms_baseline2 <- rma.mv(yi, vi, 
+                      mods = ~AI*as.factor(baseline), 
+                      random = list(~ AI | study, ~1 | id), 
+                      struct = "UN", 
+                      method = "ML", 
+                      control = list(optimizer = "nlm"), 
+                      data = multi2)
+
+ms_baseline2
+
+anova(ms_baseline2, btt=15:26)
+``` 
+
+
+
+
+#### Mod effect
+
+```{r}
+reg1 = data.frame(ms_baseline2$beta, ms_baseline2$ci.lb, ms_baseline2$ci.ub) %>%
+  rownames_to_column("trat") %>%
+  separate(trat, into = c("lado1", "lado2"), sep = ":") %>%
+  separate(lado2, into = c("lado3","lixo"),sep = "[[)]]" ) %>% 
+  select(-lixo) %>%
+  separate(lado3, into = c("lixo","lado4"),sep = "baseline") %>%
+  select(-lixo) %>%
+  separate(lado1, into = c("lixo","lado1"),sep = "AI" ) %>%
+  select(-lixo) %>%
+  filter(lado1 != "NA") %>% 
+  set_names("fungicide", "class", "mean", "ci.lb", "ci.ub") %>%
+  mutate(class = c(rep("high", 12), rep("low", 12)))
+  
+
+mean = reg1 %>% 
+  group_by(fungicide) %>% 
+  select(1:3) %>% 
+  spread(class, mean) %>% 
+  mutate(mean = (1-exp((high + low)))*100) %>% 
+  select(1,4)
+
+upper = reg1%>% 
+  group_by(fungicide) %>% 
+  select(1,2,4) %>% 
+  spread(class, ci.lb) %>% 
+  mutate(upper = (1-exp((high + low)))*100) %>% 
+  select(1,4)
+
+lower = reg1%>% 
+  group_by(fungicide) %>% 
+  select(1,2,5) %>% 
+  spread(class, ci.ub) %>% 
+  mutate(lower = (1-exp((high + low)))*100) %>% 
+  select(1,4)
+
+reg3 = left_join(mean, lower, by= c("fungicide")) %>% 
+  left_join( upper, by = c("fungicide")) %>% 
+  mutate(class = rep("low", length("fungicide"))) %>% 
+  select("fungicide", "class", "mean", "lower", "upper")
+
+
+high = reg1 %>% 
+  filter(class == "high") %>% 
+  group_by(fungicide, class) %>%
+  summarise(mean = (1-exp(mean))*100,
+            lower = (1-exp(ci.ub))*100,
+            upper = (1-exp(ci.lb))*100) 
+
+eff_baseline = rbind(high,reg3)
+eff_baseline
+
+openxlsx::write.xlsx(eff_baseline, here("data","eff_baseline_results.xlsx"), colNames = TRUE)
+
+```
+
+### Mod: Region 
+
+```{r}
+multi2 = multi2 %>% 
+mutate(region = case_when(
+    state == "MT" ~ "North",
+    state == "BA" ~ "North",
+    state == "MS" ~ "North",
+    state == "GO" ~ "North",
+    state == "PR" ~ "South",
+    state == "MG" ~ "North",
+    state == "SP" ~ "South",
+    state == "RS" ~ "South")) 
+
+multi2 %>%
+  group_by(study,region, AI) %>% 
+  summarise() %>% 
+  tabyl(AI,region)
+
+multi2 %>%
+  group_by(study,region) %>% 
+  summarise() %>% 
+  tabyl(region)
+
+ma2_region_sev <- rma.mv(yi, vi, 
+                      mods = ~AI * as.factor(region), 
+                      random = list(~ AI | study, ~1 | id), 
+                      struct = "UN", 
+                      method = "ML", 
+                      control = list(optimizer = "nlm"), 
+                      data = multi2)
+ma2_region_sev
+
+anova(ma2_region_sev, btt=15:26)
+```
+
+
+### Inconsistency
+
+We used a factorial-type ANOVA model to determine the significance of the *treatment x design* interaction, evaluated based on the Wald test statistic.
+
+```{r}
+sev_design <- read_excel(here("data", "sev_design.xlsx"), 1) 
+
+mv_sev_design <- rma.mv(yi, vi,
+                      mods = ~AI * design,
+                      random = list(~ 1 | study / design / AI),
+                      struct = "UN", 
+                      method = "ML", 
+                      control = list(optimizer = "nlm"), 
+                      data = sev_design)
+
+mv_sev_design
+
+anova(mv_sev_design,  btt=15:26)
+```
+

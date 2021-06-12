@@ -1,0 +1,4 @@
+"0","# import data"
+"0","caf_upl <- read_excel(here(""data"", ""caf_upl_10092018.xlsx""), 1) %>%"
+"0","  filter(AI != ""NA"")"
+"2","package ‘bindrcpp’ was built under R version 3.4.4"

@@ -1,0 +1,165 @@
+---
+title: "Pathogenicity"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Import 
+
+```{r}
+library(broom)
+library(agricolae)
+library(tidyverse)
+
+pat_ufrgs <- read.table("ufrgs.csv", h=T, sep=";")
+pat_ufrgs_rev <- read.table("ufrgs_revisado.csv", h=T, sep=";")
+pat_ufv <- read.table("ufv.csv", h=T, sep=";")
+pat_ufv_rev <- read.table("ufv_revisado.csv", h=T, sep=";")
+
+
+# Variable "sev" by treatment 
+
+
+### UFV
+pat_ufv %>% group_by(exp, isolado, genotipo, cultivar, dai) %>% summarize(media = mean(sev, na.rm=TRUE)) %>% 
+ggplot(., aes(dai,media, color=isolado))+
+ geom_point()+ geom_line()+facet_wrap(~exp+genotipo+cultivar)+
+  ggsave("figs/sev_ufv.png",width=10, height=10, dpi=300)
+
+pat_ufv %>% group_by(exp, isolado, genotipo, cultivar, dai, espiga) %>% 
+ggplot(., aes(dai,sev, color=factor(espiga)))+
+ geom_point()+ geom_line()+facet_wrap(~exp+isolado+cultivar)+
+  ggsave("figs/sev_ufv_espiga.png",width=20, height=20, dpi=300)
+
+
+### UFRGS
+pat_ufrgs %>% group_by(exp, isolado, genotipo, cultivar, dai) %>% summarize(media = mean(sev, na.rm=TRUE)) %>% 
+ggplot(., aes(dai,media, color=isolado))+
+ geom_point()+ geom_line()+facet_wrap(~exp+genotipo+cultivar)+
+  ggsave("figs/sev_ufrgs.png",width=10, height=5, dpi=300)
+
+pat_ufrgs %>% group_by(exp, isolado, genotipo, dai, espiga) %>% 
+ggplot(., aes(dai,sev, color=factor(espiga)))+
+ geom_point()+ geom_line()+facet_wrap(~exp+isolado+cultivar)+
+  ggsave("figs/sev_ufrgs_espiga.png",width=10, height=10, dpi=300)
+
+########dadods revisados
+
+### UFRGS
+pat_ufrgs_rev %>% group_by(exp, isolado, genotipo, cultivar, dai) %>% summarize(media = mean(sev, na.rm=TRUE)) %>% 
+ggplot(., aes(dai,media, color=isolado))+
+ geom_point()+ geom_line()+facet_wrap(~exp+cultivar)+
+  ggsave("figs/sev_ufrgs_rev.png",width=10, height=5, dpi=300)
+
+pat_ufrgs_rev %>% group_by(exp, isolado, genotipo, cultivar, dai, espiga) %>% 
+ggplot(., aes(dai,sev, color=factor(espiga)))+
+ geom_point()+ geom_line()+facet_wrap(~cultivar+isolado)+
+  ggsave("figs/sev_ufrgs_espiga_rev.png",width=10, height=10, dpi=300)
+
+### UFV
+pat_ufv_rev %>% group_by(exp, isolado, genotipo, cultivar, dai) %>% summarize(media = mean(sev, na.rm=TRUE)) %>% 
+ggplot(., aes(dai,media, color=isolado))+
+ geom_point()+ geom_line()+facet_wrap(~exp+genotipo+cultivar)+
+  ggsave("figs/sev_ufv_rev.png",width=10, height=10, dpi=300)
+
+pat_ufv_rev %>% group_by(exp, isolado, genotipo, cultivar, dai, espiga) %>% 
+ggplot(., aes(dai,sev, color=factor(espiga)))+
+ geom_point()+ geom_line()+facet_wrap(~exp+cultivar+isolado)+
+  ggsave("figs/sev_ufv_espiga_rev.png",width=20, height=20, dpi=300)
+
+
+# UFGRS
+
+exp_rev <- pat_ufrgs_rev %>% 
+  mutate(dia = as.numeric(dai)) %>%
+  group_by(cultivar, isolado, genotipo, espiga) %>% 
+  do(tidy(audpc(.$sev, .$dia)))
+
+### rename variable x to audpc
+names(exp_rev)[6] <- "audpc"
+
+summary(exp_rev)
+
+## UFV
+exp_ufv_rev <- pat_ufv_rev %>% 
+  mutate(dia = as.numeric(dai)) %>% filter(isolado != "test") %>% 
+  group_by(cultivar, isolado, genotipo, espiga) %>% 
+  do(tidy(audpc(.$sev, .$dia)))
+
+
+str(pat_ufv_rev)
+### rename variable x to audpc
+names(exp_ufv_rev)[6] <- "audpc"
+
+summary(exp_rev)
+
+
+```
+
+
+## Descritive analysis
+```{r}
+
+exp_rev %>% 
+  ggplot(aes(isolado, audpc, color = genotipo))+
+  facet_wrap(~cultivar)+
+  geom_boxplot()+theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggsave("figs/ufrgs_rev.png",width=10, height=5, dpi=300)
+  
+
+
+```
+
+
+## LMM - UFRGS (dados revisados)
+
+```{r}
+
+# fit a model with isolate as random effect 
+library(lme4)
+
+lmm_ufrgs_rev <- lmer(audpc ~ genotipo + cultivar+ (1 | isolado), data=exp_rev, REML=FALSE)
+
+summary(lmm_ufrgs_rev)
+
+library(car)
+Anova(lmm_ufrgs_rev)
+
+# Check normality and heteroscedasticity 
+library(lattice)
+plot(lmm_ufrgs_rev,type=c("p","smooth"))
+qqmath(lmm_ufrgs_rev,id=0.05)
+
+# Multiple comparisons between genotypes
+library(lsmeans)
+medias_ufrgs_rev <- lsmeans(lmm_ufrgs_rev, ~ genotipo*cultivar)
+tab_ufrgs_rev <- cld(medias_ufrgs_rev, by = NULL, Letters = LETTERS, alpha = .05)  
+tab_ufrgs_rev
+
+```
+
+
+
+
+
+## Plot 
+
+```{r}
+
+# plot dos intervalos de confianca
+ 
+tab_ufrgs_rev %>% 
+  ggplot(aes(genotipo, lsmean))+
+ geom_point()+ facet_wrap(~cultivar, scales = "free")+
+ theme_minimal()+
+ coord_flip()+
+  geom_errorbar(aes(ymin = asymp.LCL, ymax=asymp.UCL), width = 0.1)+
+  theme(legend.position="none")+
+ labs(y = "AUDPC", x ="")+
+  ggsave("figs/figure_audpc.png", width=3.5, height=2.5)
+
+```
+

@@ -1,0 +1,219 @@
+---
+title: Selection of DMI+QoI mixtures plus mancozeb to control Asian soybean rust 
+author: "Franklin Machado"
+date: "September 5, 2017"
+output:
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, echo = FALSE, warnings = FALSE)
+
+# Load packages 
+library(tidyverse)
+library(plyr)
+library(readxl)
+library(metafor)
+library(ggthemes)
+library(cowplot)
+library(scales)
+library(knitr)
+library(nloptr)
+library(minqa)
+library(broom)
+library(DT)
+```
+
+
+# Fungicide selection
+
+## Import data
+
+```{r}
+
+# import data
+dat <- read_excel("geral_soja.xlsx", 2)
+tail(dat)
+head(dat)
+```
+
+## Selecting the most frequently found fungicides
+
+```{r}
+
+dat2 <- dat %>% group_by(study) %>% filter (AI == "CHECK"| 
+                        AI == "PICOXISTROBINA+CIPROCONAZOLE"|
+                        AI == "PICOXISTROBINA+CIPROCONAZOLE+MANCOZEBE"| 
+                        AI == "AZOXISTROBINA+BENZOVINDIFLUPYR"|
+                        AI == "AZOXISTROBINA+BENZOVINDIFLUPYR+MANCOZEBE"| 
+                        AI == "TRIFLOXISTROBINA+PROTIOCONAZOLE"|
+                        AI == "TRIFLOXISTROBINA+PROTIOCONAZOLE+MANCOZEBE"|
+                        AI == "PICOXISTROBINA+TEBUCONAZOLE"| 
+                        AI == "PICOXISTROBINA+TEBUCONAZOLE+MANCOZEBE"|
+                        AI == "PIRACLOSTROBINA+EPOXICONAZOLE"| 
+                        AI == "PIRACLOSTROBINA+EPOXICONAZOLE+MANCOZEBE"|
+                        AI == "PIRACLOSTROBINA+FLUXAPIROXADE"| 
+                        AI == "PIRACLOSTROBINA+FLUXAPIROXADE+MANCOZEBE"|
+                        AI == "AZOXISTROBINA+CIPROCONAZOLE"|
+                        AI == "AZOXISTROBINA+CIPROCONAZOLE+MANCOZEBE") %>%  
+                        #yield_kg != "NA"& 
+                        #sev_r6 != "NA"& 
+                        filter(length(study)>2) 
+  
+
+```
+
+## Create variable with or without MANCOZEB
+
+```{r}
+
+dat2$manc <- ifelse(dat2$AI == "CHECK", "CHECK", 
+                    ifelse(dat2$AI == "PICOXISTROBINA+CIPROCONAZOLE+MANCOZEBE","with",
+                                        ifelse(dat2$AI =="AZOXISTROBINA+BENZOVINDIFLUPYR+MANCOZEBE","with",
+                                       ifelse(dat2$AI == "TRIFLOXISTROBINA+PROTIOCONAZOLE+MANCOZEBE","with",
+                                        ifelse(dat2$AI =="PICOXISTROBINA+TEBUCONAZOLE+MANCOZEBE","with",
+                                       ifelse(dat2$AI == "PIRACLOSTROBINA+EPOXICONAZOLE+MANCOZEBE","with",
+                                        ifelse(dat2$AI =="PIRACLOSTROBINA+FLUXAPIROXADE+MANCOZEBE", "with",
+                                        ifelse(dat2$AI =="AZOXISTROBINA+CIPROCONAZOLE+MANCOZEBE",
+                                               "with","without"))))))))
+
+```
+
+## Rename AI
+
+```{r}
+dat2$AI <-  revalue(dat2$AI, c("CHECK" = "AACHECK",
+                               "PICOXISTROBINA+CIPROCONAZOLE" = "PICO + CYPR",
+                               "PICOXISTROBINA+CIPROCONAZOLE+MANCOZEBE" = "PICO + CYPR + MANC",
+                               "AZOXISTROBINA+BENZOVINDIFLUPYR" = "AZOX + BENZ",
+                               "AZOXISTROBINA+BENZOVINDIFLUPYR+MANCOZEBE" = "AZOX + BENZ + MANC",
+                               "TRIFLOXISTROBINA+PROTIOCONAZOLE" = "TFLX + PROT",
+                               "TRIFLOXISTROBINA+PROTIOCONAZOLE+MANCOZEBE" = "TFLX + PROT + MANC",
+                               "PICOXISTROBINA+TEBUCONAZOLE" = "PICO + TEBU",
+                               "PICOXISTROBINA+TEBUCONAZOLE+MANCOZEBE" = "PICO + TEBU + MANC",
+                               "PIRACLOSTROBINA+EPOXICONAZOLE" = "PYRA + EPOX",
+                               "PIRACLOSTROBINA+EPOXICONAZOLE+MANCOZEBE" = "PYRA + EPOX + MANC",
+                               "PIRACLOSTROBINA+FLUXAPIROXADE" = "PYRA + FLUX",
+                               "PIRACLOSTROBINA+FLUXAPIROXADE+MANCOZEBE" = "PYRA + FLUX + MANC",
+                               "AZOXISTROBINA+CIPROCONAZOLE" = "AZOX + CYPR",
+                               "AZOXISTROBINA+CIPROCONAZOLE+MANCOZEBE" = "AZOX + CYPR + MANC"))
+
+
+```
+
+# Create variables for MA
+
+```{r,echo = TRUE}
+
+# Calcula a variancia do ensaio (V)
+dat2$V_sev <- ((dat2$cv_sev_r6/100)*dat2$mean_sev)^2
+
+dat2$V_yield <- ((dat2$cv_yield_kg/100)*dat2$mean_yield)^2
+
+
+# Sampling variance for log of the mean (Paul et al., 2008) to use in multivariate model
+dat2$L.var_yield <- with(dat2, V_yield / (4 * yield_kg^2))
+dat2$L.var_sev <- with(dat2, V_sev / (4 * sev_r6^2))
+
+
+# Calculate the D
+dat2$D <-dat2$yield_kg - dat2$check_yield_kg
+
+# Sampling variance for yield
+dat2$var_D <- dat2$V_yield/4 
+
+
+
+# Multi treatment meta-analysis (response ratio) 
+# Preparing the variables: yi is the effect size and vi is the sampling variance
+dat2$yi <- log(dat2$yield_kg)
+dat2$vi <- dat2$L.var_yield
+dat2$id <- 1:nrow(dat2)
+
+
+dat2$yi_sev <- log(dat2$sev_r6)
+dat2$vi_sev <- dat2$L.var_sev
+
+# Multi treatment meta-analysis (D) 
+
+# Preparing the variables: yi is the effect size and vi is the sampling variance
+dat2$yi2 <- dat2$yield_kg
+dat2$vi2 <- dat2$var_D
+
+
+```
+
+# Export the dataset
+
+```{r}
+
+kable(data.frame(table(dat2$AI)))
+
+#write.csv(dat2, "dat2.csv")
+#openxlsx::write.xlsx(dat2, "dat_2.xlsx", colNames = TRUE)
+#if(devtools::find_rtools()) Sys.setenv(R_ZIPCMD= file.path(devtools:::get_rtools_path(),"zip")) #### RODAR ISSO NO CONSOLE
+
+```
+
+# Descritive analysis
+
+## number of studies by fungicide
+
+```{r}
+dat_filtrado <- read_excel("dat_filtrado.xlsx", 2) %>% filter(AI != "NA")
+
+
+dat_freq <- data.frame(table(AI = dat_filtrado$AI, dat_filtrado$study))
+dat_freq2 <- dat_freq %>% 
+  filter(Freq > 0)
+kable(data.frame(table(AI = dat_freq2$AI)))
+
+data.frame(table(dat_filtrado$AI))
+```
+
+
+# Plots
+
+## Sev by year
+
+```{r}
+
+
+dat_filtrado %>% filter(sev_r6 != "NA") %>% ggplot(aes(AI,sev_r6, fill = manc))+
+geom_boxplot(outlier.size = NA)+ 
+  theme_minimal()+ facet_wrap(~year, ncol = 2)+
+geom_jitter(width = 0.1, height = 0.1, shape = 21, alpha=0.4)+
+theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+scale_fill_grey(start = 0.5, end = 0.95)+
+  scale_x_discrete(labels = c("_CHECK" = "CHECK"))+
+  theme(legend.position = "none")+
+  labs(title ="", x = "", y = "Severity (%)")+
+  ggsave("figs/sev_AI_year.png", width=7, height=5)
+
+
+```
+
+## Fungicides by year
+
+```{r}
+
+dat_filtrado %>% filter(sev_r6 != "NA", AI != "AACHECK") %>% ggplot(aes(year,sev_r6, fill = manc))+
+geom_boxplot(outlier.size = NA)+ 
+  theme_grey()+ facet_wrap(~AI, ncol = 4)+
+geom_jitter(width = 0.1, height = 0.1, shape = 21, alpha=0.4)+
+theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+scale_fill_grey(start = 0.5, end = 0.95)+
+  scale_x_discrete(labels = c("_CHECK" = "CHECK"))+
+  theme(legend.position = "none")+
+  labs(title ="", x = "", y = "Severity (%)")+
+  ggsave("figs/sev_year.png", width=7, height=6)
+
+```
+
+

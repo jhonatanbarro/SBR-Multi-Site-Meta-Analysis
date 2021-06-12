@@ -1,0 +1,404 @@
+---
+title: Meta-analysis of the effect of DMI+QoI mixtures plus mancozeb on Asian soybean
+  rust and yield return
+author: "Franklin Machado"
+date: "September 5, 2017"
+output:
+  html_document:
+    fig_width: 10
+    number_sections: yes
+    theme: cerulean
+    toc: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+  word_document: default
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, echo = FALSE)
+
+# Load packages 
+library(tidyverse)
+library(plyr)
+library(readxl)
+library(metafor)
+library(ggthemes)
+library(cowplot)
+library(scales)
+library(knitr)
+library(nloptr)
+library(minqa)
+library(broom)
+library(DT)
+```
+
+# Import data
+
+```{r}
+
+# import data
+dat <- read_excel("geral_soja.xlsx", 2)
+tail(dat)
+head(dat)
+
+
+# check structure
+glimpse(dat)
+
+kable(data.frame(table(dat$fungicide)))
+length(unique(dat$study))
+
+
+
+#filter the select fungicides
+dat2 <- dat %>% group_by(study) %>% filter (fungicide == "CHECK"| 
+                        fungicide == "APROACH PRIMA"|
+                        fungicide == "ELATUS"| 
+                        fungicide == "FOX"|
+                        fungicide == "HOROS"| 
+                        fungicide == "OPERA"|
+                        fungicide == "ORKESTRA"|
+                        fungicide == "PRIORI XTRA"| 
+                        fungicide == "APROACH PRIMA+UNIZEB GOLD"|
+                        fungicide == "ELATUS+UNIZEB GOLD"| 
+                        fungicide == "FOX+UNIZEB GOLD"|
+                        fungicide == "HOROS+UNIZEB GOLD"| 
+                        fungicide == "OPERA+UNIZEB GOLD"|
+                        fungicide == "ORKESTRA+UNIZEB GOLD"|
+                        fungicide == "PRIORI XTRA+UNIZEB GOLD") %>%  
+                        #yield_kg != "NA"& 
+                        #sev_r6 != "NA"& 
+                        filter(length(study)>1)
+
+dat2$manc <- ifelse(dat2$fungicide == "CHECK", "CHECK", 
+                    ifelse(dat2$fungicide == "APROACH PRIMA+UNIZEB GOLD","with",
+                                       ifelse(dat2$fungicide == "ELATUS+UNIZEB GOLD","with",
+                                        ifelse(dat2$fungicide =="FOX+UNIZEB GOLD","with",
+                                       ifelse(dat2$fungicide == "HOROS+UNIZEB GOLD","with",
+                                        ifelse(dat2$fungicide =="OPERA+UNIZEB GOLD","with",
+                                       ifelse(dat2$fungicide == "OPERA+UNIZEB GOLD","with",
+                                        ifelse(dat2$fungicide =="ORKESTRA+UNIZEB GOLD", "with",
+                                        ifelse(dat2$fungicide =="PRIORI XTRA+UNIZEB GOLD",
+                                               "with","without")))))))))
+
+dat2$AI <-  revalue(dat2$AI, c("CHECK" = "AACHECK",
+                               "PICOXISTROBINA+CIPROCONAZOLE" = "PICO + CIPR",
+                               "PICOXISTROBINA+CIPROCONAZOLE+MANCOZEBE" = "PICO + CIPR + MANC",
+                               "AZOXISTROBINA+BENZOVINDIFLUPYR" = "AZOX + BENZ",
+                               "AZOXISTROBINA+BENZOVINDIFLUPYR+MANCOZEBE" = "AZOX + BENZ + MANC",
+                               "TRIFLOXISTROBINA+PROTIOCONAZOLE" = "TFLX + PROT",
+                               "TRIFLOXISTROBINA+PROTIOCONAZOLE+MANCOZEBE" = "TFLX + PROT + MANC",
+                               "PICOXISTROBINA+TEBUCONAZOLE" = "PICO + TEBU",
+                               "PICOXISTROBINA+TEBUCONAZOLE+MANCOZEBE" = "PICO + TEBU + MANC",
+                               "PIRACLOSTROBINA+EPOXICONAZOLE" = "PIRA + EPOX",
+                               "PIRACLOSTROBINA+EPOXICONAZOLE+MANCOZEBE" = "PIRA + EPOX + MANC",
+                               "PIRACLOSTROBINA+FLUXAPIROXADE" = "PIRA + FLUX",
+                               "PIRACLOSTROBINA+FLUXAPIROXADE+MANCOZEBE" = "PIRA + FLUX + MANC",
+                               "AZOXISTROBINA+CIPROCONAZOLE" = "AZOX + CIPR",
+                               "AZOXISTROBINA+CIPROCONAZOLE+MANCOZEBE" = "AZOX + CIPR + MANC"))
+
+
+
+kable(data.frame(table(dat2$AI)))
+
+#write.csv(dat2, "dat2.csv")
+#openxlsx::write.xlsx(dat2, "dat_selecionados.xlsx")
+
+```
+
+# Descritive analysis
+
+## number of studies by fungicide
+
+```{r}
+dat_freq <- data.frame(table(dat2$AI, dat2$study))
+dat_freq2 <- dat_freq %>% 
+  filter(Freq > 0)
+dat_freq2
+kable(data.frame(table(dat_freq2$Var1)))
+
+
+
+```
+
+# Variables for MA
+
+
+
+```{r}
+# Calcula a variancia do ensaio (V)
+dat2$V_sev <- ((dat2$cv_sev_r6/100)*dat2$mean_sev)^2
+
+dat2$V_yield <- ((dat2$cv_yield_kg/100)*dat2$mean_yield)^2
+
+
+# Sampling variance for log of the mean (Paul et al., 2008) to use in multivariate model
+dat2$L.var_yield <- with(dat2, V_yield / (4 * yield_kg^2))
+dat2$L.var_sev <- with(dat2, V_sev / (4 * sev_r6^2))
+
+
+# Calculate the D
+dat2$D <-dat2$yield_kg - dat2$check_yield_kg
+
+# Sampling variance for yield
+dat2$var_D <- dat2$V_yield/4 
+
+
+
+# Multi treatment meta-analysis (response ratio) 
+# Preparing the variables: yi is the effect size and vi is the sampling variance
+dat2$yi <- log(dat2$yield_kg)
+dat2$vi <- dat2$L.var_yield
+dat2$id <- 1:nrow(dat2)
+
+
+dat2$yi_sev <- log(dat2$sev_r6)
+dat2$vi_sev <- dat2$L.var_sev
+
+# Multi treatment meta-analysis (D) 
+
+# Preparing the variables: yi is the effect size and vi is the sampling variance
+dat2$yi2 <- dat2$yield_kg
+dat2$vi2 <- dat2$var_D
+
+
+```
+
+# modelo multivariado
+
+## Yield return
+
+```{r}
+
+ma_AI <- rma.mv(yi2, vi2, mods= ~ AI,  method="ML",  random = list(~ AI | study, ~1 | id), struct="UN", control = list(optimizer="nlm"), data=dat2)
+
+summary(ma_AI)
+
+anova(ma_AI, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                     c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                     c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                     c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                     c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                     c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                     c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+
+
+```
+
+
+## Percent yield return
+
+
+```{r}
+
+ma_AI_perc_yield <- rma.mv(yi, vi, mods= ~ AI,  method="ML",  random = list(~ AI | study, ~1 | id), struct="UN", control = list(optimizer="nlm"), data=dat2)
+
+summary(ma_AI_perc_yield)
+
+anova(ma_AI_perc_yield, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+data.frame(estimate = round((exp(ma_AI_perc_yield$b)-1)*100, 4), 
+           ci.lb = round((exp(ma_AI_perc_yield$ci.lb)-1)*100, 4),
+           ci.ub = round((exp(ma_AI_perc_yield$ci.ub)-1)*100, 4))
+
+
+```
+
+## Control efficacy
+
+
+```{r}
+ma_AI_sev <- rma.mv(yi_sev, vi_sev, mods= ~ AI,  method="ML",  random = list(~ AI | study, ~1 | id), struct="UN", control = list(optimizer="nlm"), data=dat2)
+
+summary(ma_AI_sev)
+
+anova(ma_AI_sev, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+ data.frame(estimate = round((1-exp(ma_AI_sev$b))*100, 4), 
+           ci.lb = round((1-exp(ma_AI_sev$ci.ub))*100, 4),
+           ci.ub = round((1-exp(ma_AI_sev$ci.lb))*100, 4))
+
+
+```
+
+
+# Mantendo só ensaios com e sem mancozeb no mesmo estudo
+
+## Import data
+
+```{r}
+# import data
+dat_filtrado <- read_excel("dat_filtrado.xlsx", 2) %>% filter(AI != "NA")
+tail(dat_filtrado)
+
+kable(data.frame(table(dat_filtrado$AI)))
+length(unique(dat_filtrado$study))
+
+# Numero de estudos por fungicida
+
+dat6 <- data.frame(table(dat_filtrado$AI, dat_filtrado$study))
+dat7 <- dat6 %>% 
+  filter(Freq > 0)
+dat7
+data.frame(table(dat7$Var1))
+
+
+
+
+```
+
+## D
+
+```{r}
+
+
+ma_AI_filtrado <- rma.mv(yi2, vi2, mods= ~ AI,  method="ML", random = list(~ AI | study, ~1 | id), struct="UN", control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_filtrado)
+
+anova(ma_AI_filtrado, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                     c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                     c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                     c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                     c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                     c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                     c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+
+```
+
+## Percent yield return
+
+```{r}
+ma_AI_perc_yield2 <- rma.mv(yi, vi, mods= ~ AI,  method="ML", random = list(~ AI | study, ~1 | id),  struct="UN",control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_perc_yield2)
+
+anova(ma_AI_perc_yield2, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+data.frame(estimate = round((exp(ma_AI_perc_yield2$b)-1)*100, 4), 
+           ci.lb = round((exp(ma_AI_perc_yield2$ci.lb)-1)*100, 4),
+           ci.ub = round((exp(ma_AI_perc_yield2$ci.ub)-1)*100, 4))
+```
+
+
+## Control efficacy
+
+```{r}
+ma_AI_sev2 <- rma.mv(yi_sev, vi_sev, mods= ~ AI,  method="ML",  random = list(~ AI | study, ~1 | id), struct="UN", control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_sev2)
+
+anova(ma_AI_sev2, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+ data.frame(estimate = round((1-exp(ma_AI_sev2$b))*100, 4), 
+           ci.lb = round((1-exp(ma_AI_sev2$ci.ub))*100, 4),
+           ci.ub = round((1-exp(ma_AI_sev2$ci.lb))*100, 4))
+
+```
+
+
+# Plots
+
+## Boxplot yield by fungicide
+```{r}
+dat2$AI <- revalue(dat2$AI, c("AACHECK" = "_CHECK"))
+
+dat2 %>% filter(yield_kg != "NA") %>% ggplot(aes(AI, yield_kg, fill = manc))+
+geom_boxplot(outlier.size = NA)+ 
+  theme_minimal()+
+geom_jitter(width = 0.1, height = 0.1, shape = 21, alpha=0.4)+
+theme(axis.text.x = element_text(angle = 25, hjust = 1))+
+scale_fill_grey(start = 0.5, end = 0.95)+
+  scale_x_discrete(labels = c("_CHECK" = "CHECK"))+
+  theme(legend.position = "none")+
+  labs(title ="", x = "", y = "Yield (kg/ha)")+
+  ggsave("figs/yield_AI.png", width=7, height=4)
+
+```
+## Boxplot sev by fungicide
+```{r}
+dat2$AI <- revalue(dat2$AI, c("AACHECK" = "_CHECK"))
+
+dat2 %>% filter(sev_r6 != "NA") %>% ggplot(aes(AI,sev_r6, fill = manc))+
+geom_boxplot(outlier.size = NA)+ 
+  theme_minimal()+
+geom_jitter(width = 0.1, height = 0.1, shape = 21, alpha=0.4)+
+theme(axis.text.x = element_text(angle = 25, hjust = 1))+
+scale_fill_grey(start = 0.5, end = 0.95)+
+  scale_x_discrete(labels = c("_CHECK" = "CHECK"))+
+  theme(legend.position = "none")+
+  labs(title ="", x = "", y = "Severity (%)")+
+  ggsave("figs/sev_AI.png", width=7, height=4)
+
+
+```
+## Map
+
+```{r}
+dat_lat_long <- dat2 %>% unite( local2, location, state, country, sep = " ")
+
+library(ggmap)
+#data3 <- geocode(dat_lat_long$local2)
+data4 <- bind_cols(dat2, data3)
+
+#Get world map info
+brazil_map <- map_data("world", "brazil")
+
+library(rgdal)
+brazil_map2 <-readOGR("BRA/BRA_adm1.shp", layer='BRA_adm1')
+
+dat_local <- data4 %>% filter(fungicide == "CHECK", lat != "NA")
+
+
+map <- ggplot(dat_local)+ geom_polygon(data = brazil_map2, 
+                                      aes(x=long, y=lat, group=group), fill = "grey96", color ="grey50")+ 
+  geom_jitter(alpha= 1/2, width=0.5, height=0.3, data = dat_local, aes (x = lon, y = lat, size = check_sev_r6))+
+  coord_fixed()+
+  scale_shape_manual(values = c(17,16))+
+  theme_light()+
+  facet_wrap(~year, ncol = 4)+
+  coord_map(xlim=-c(57.5, 43.5), ylim=-c(34,10.5))+
+  theme(legend.position = "top", strip.text = element_text(face="bold", size=16),text = element_text(size=16))+
+  #guides(shape=FALSE)+
+  labs(x = "Longitude", y = "Latitude", size ="Severity at R6 stage (%)", color = "Harvest year")+
+  #ggtitle("Local dos ensaios")+
+  ggsave("figs/mapa_brazil4.png", width=13, height=8)
+
+
+
+
+```
+
+
+
+

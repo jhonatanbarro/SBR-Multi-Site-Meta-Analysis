@@ -1,0 +1,24 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1536630898038.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3966854625",
+    "id" : "2A59342C",
+    "lastKnownWriteTime" : 1536630846,
+    "last_content_update" : 1536630919175,
+    "path" : "~/Google Drive/Franklin-Machado/articles/Machado-SBR_mancozeb/r/code.Rmd",
+    "project_path" : "code.Rmd",
+    "properties" : {
+        "cursorPosition" : "112,0",
+        "docOutlineSize" : "90",
+        "docOutlineVisible" : "1",
+        "scrollLine" : "108"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

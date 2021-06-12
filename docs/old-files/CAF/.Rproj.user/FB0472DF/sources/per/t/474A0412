@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1518532151025.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2162803370",
+    "id" : "474A0412",
+    "lastKnownWriteTime" : 1492633754,
+    "last_content_update" : 1492633754,
+    "path" : "~/Dropbox/FRANKLIN/articles/meta-analysis-wheat/r/sev-analysis/fhb-sev.Rmd",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "76,33",
+        "scrollLine" : "59"
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

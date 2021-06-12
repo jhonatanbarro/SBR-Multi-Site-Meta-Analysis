@@ -1,0 +1,26 @@
+{
+"type": "FeatureCollection",
+                                                                                
+"features": [
+{ "type": "Feature", "id": 1, "properties": { "name": "Abilene TX", "country.etc": "TX", "pop": 113888, "lat": 32.450000, "long": -99.740000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -99.74, 32.45 ] } },
+{ "type": "Feature", "id": 2, "properties": { "name": "Akron OH", "country.etc": "OH", "pop": 206634, "lat": 41.080000, "long": -81.520000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -81.52, 41.08 ] } },
+{ "type": "Feature", "id": 3, "properties": { "name": "Alameda CA", "country.etc": "CA", "pop": 70069, "lat": 37.770000, "long": -122.260000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -122.26, 37.77 ] } },
+{ "type": "Feature", "id": 4, "properties": { "name": "Albany GA", "country.etc": "GA", "pop": 75510, "lat": 31.580000, "long": -84.180000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -84.18, 31.58 ] } },
+{ "type": "Feature", "id": 5, "properties": { "name": "Albany NY", "country.etc": "NY", "pop": 93576, "lat": 42.670000, "long": -73.800000, "capital": 2 }, "geometry": { "type": "Point", "coordinates": [ -73.8, 42.67 ] } },
+{ "type": "Feature", "id": 6, "properties": { "name": "Albany OR", "country.etc": "OR", "pop": 45535, "lat": 44.620000, "long": -123.090000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -123.09, 44.62 ] } },
+{ "type": "Feature", "id": 7, "properties": { "name": "Albuquerque NM", "country.etc": "NM", "pop": 494962, "lat": 35.120000, "long": -106.620000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -106.62, 35.12 ] } },
+{ "type": "Feature", "id": 8, "properties": { "name": "Alexandria LA", "country.etc": "LA", "pop": 44933, "lat": 31.290000, "long": -92.460000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -92.46, 31.29 ] } },
+{ "type": "Feature", "id": 9, "properties": { "name": "Alexandria VA", "country.etc": "VA", "pop": 127159, "lat": 38.820000, "long": -77.090000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -77.09, 38.82 ] } },
+{ "type": "Feature", "id": 10, "properties": { "name": "Alhambra CA", "country.etc": "CA", "pop": 88857, "lat": 34.080000, "long": -118.130000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -118.13, 34.08 ] } },
+{ "type": "Feature", "id": 11, "properties": { "name": "Aliso Viejo CA", "country.etc": "CA", "pop": 41975, "lat": 33.570000, "long": -117.730000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -117.73, 33.57 ] } },
+{ "type": "Feature", "id": 12, "properties": { "name": "Allen TX", "country.etc": "TX", "pop": 84467, "lat": 33.110000, "long": -96.670000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -96.67, 33.11 ] } },
+{ "type": "Feature", "id": 13, "properties": { "name": "Allentown PA", "country.etc": "PA", "pop": 105224, "lat": 40.600000, "long": -75.480000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -75.48, 40.6 ] } },
+{ "type": "Feature", "id": 14, "properties": { "name": "Aloha OR", "country.etc": "OR", "pop": 45531, "lat": 45.490000, "long": -122.870000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -122.87, 45.49 ] } },
+{ "type": "Feature", "id": 15, "properties": { "name": "Altadena CA", "country.etc": "CA", "pop": 43280, "lat": 34.190000, "long": -118.130000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -118.13, 34.19 ] } },
+{ "type": "Feature", "id": 16, "properties": { "name": "Altamonte Springs FL", "country.etc": "FL", "pop": 40712, "lat": 28.660000, "long": -81.400000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -81.4, 28.66 ] } },
+{ "type": "Feature", "id": 17, "properties": { "name": "Altoona PA", "country.etc": "PA", "pop": 46442, "lat": 40.510000, "long": -78.400000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -78.4, 40.51 ] } },
+{ "type": "Feature", "id": 18, "properties": { "name": "Amarillo TX", "country.etc": "TX", "pop": 183295, "lat": 35.200000, "long": -101.820000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -101.82, 35.2 ] } },
+{ "type": "Feature", "id": 19, "properties": { "name": "Ames IA", "country.etc": "IA", "pop": 57683, "lat": 42.020000, "long": -93.630000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -93.63, 42.02 ] } },
+{ "type": "Feature", "id": 20, "properties": { "name": "Anaheim CA", "country.etc": "CA", "pop": 334909, "lat": 33.840000, "long": -117.870000, "capital": 0 }, "geometry": { "type": "Point", "coordinates": [ -117.87, 33.84 ] } }
+]
+}

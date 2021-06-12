@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1518126039425.000,
+    "dirty" : true,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "EB53EB82",
+    "lastKnownWriteTime" : 1513975020,
+    "last_content_update" : 1518126552598,
+    "path" : "~/Documents/FGSC/index.Rmd",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "120,0",
+        "last_setup_crc32" : "4F8F078F46f78c1",
+        "scrollLine" : "114"
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

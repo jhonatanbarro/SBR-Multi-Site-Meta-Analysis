@@ -1,0 +1,3 @@
+"0","ma2_manc <- rma.mv(yi, vi, mods = ~manc, random = list(~ manc | study, ~1 | id), struct = ""UN"", method = ""ML"", control = list(optimizer = ""nlm""), data = caf_upl2)"
+"2","
+"

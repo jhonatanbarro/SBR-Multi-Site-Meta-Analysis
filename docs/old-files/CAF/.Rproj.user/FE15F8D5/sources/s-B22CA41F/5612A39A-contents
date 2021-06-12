@@ -1,0 +1,334 @@
+
+# Data analysis
+# FGSC perithecial production on three substrates
+
+# loading packages
+
+library(readxl)
+library(tidyverse)
+# reading data
+patogen <- read_excel("patog_ufv.xlsx")
+patogen <- patogen %>%
+  filter (isolate != "test")
+
+# preparing cultivar 194
+
+patogen_194 <- patogen %>%
+  filter (cultivar == "BRS 194") %>%
+  select(1:7, 9, 11, 12, 13) %>%
+  gather(position, count, 8:9) %>%
+  filter (exp == 2) %>%
+  group_by(cultivar, dai,  genotype, species) %>%
+  summarize(median_count = median(count),
+            mad_count = mad(count),
+            mean_count = mean(count),
+            sd_count = sd(count),
+            mean_total = mean(total),
+            sd_total = sd(total),
+            mean_sev = mean(sev),
+            sd_sev = sd(sev))
+
+# preparing Guamirim
+
+patogen_Gua <- patogen %>%
+  filter (cultivar == "BRS Guamirim") %>%
+  select(1:7, 9, 11:13) %>%
+  gather(position, count, 8:9) %>%
+  filter (exp == 2) %>%
+    group_by(cultivar, dai, genotype, species, position) %>%
+  summarize(median_count = median(count),
+            mad_count = mad(count),
+            mean_count = mean(count),
+            sd_count = sd(count),
+            mean_total = mean(total),
+            sd_total = sd(total),
+            mean_sev = mean(sev),
+            sd_sev = sd(sev))
+
+
+# line plot
+
+library(viridis)
+library(ggthemes)
+
+
+# severity
+
+brs194 <- patogen_194 %>%
+  group_by(dai, genotype, species) %>%
+    ggplot(aes(dai, mean_sev, color = interaction(species, genotype), group = interaction(species, genotype)))+
+  geom_point(position = position_dodge(width=0.9))+
+      geom_line()+
+  geom_errorbar(aes(min = mean_sev - sd_sev, max = mean_sev + sd_sev),
+   width=0.2, alpha=0.3, position = position_dodge(width=0.9))+
+  theme_few()+
+  ylim(0,50)+
+  xlim(0,25)+
+  theme(legend.position = "right", strip.text = element_text(size=8, face = 'italic'))+
+ scale_color_viridis(discrete = TRUE)+
+  labs(y = "Mean Severity ", x = "Days after inoculation",
+       color = "Species.chemotype")+
+  ggsave("Figures/patogen_194.png", width=6, height=4)
+
+brsgua <- patogen_Gua %>%
+  group_by(dai, genotype, species) %>%
+  ggplot(aes(dai, mean_sev, color = interaction(species, genotype), group = interaction(species, genotype)))+
+  geom_point(position = position_dodge(width=0.9))+
+  geom_line()+
+  geom_errorbar(aes(min = mean_sev - sd_sev, max = mean_sev + sd_sev),
+                width=0.2, alpha=0.3, position = position_dodge(width=0.9))+
+  theme_few()+
+  theme(legend.position = "none", strip.text = element_text(size=8, face = 'italic'))+
+  scale_color_viridis(discrete = TRUE)+
+  ylim(0,50)+
+  xlim(0,25)+
+  labs(y = "Mean Severity ", x = "Days after inoculation",
+       color = "Species.chemotype")+
+  ggsave("Figures/patogen_gua.png", width=6, height=4)
+library(cowplot)
+grid6 <- plot_grid(brsgua, brs194, labels=c('A', "B"), rel_widths =  c(0.57, 1), ncol=2, align = "hv")
+ggsave("Figures/grid6.png", grid6, width=9, height=3)
+
+
+
+library(agricolae)
+library(broom)
+audpc_194_above <- patogen %>%
+  filter (cultivar == "BRS 194") %>%
+  filter(exp == 2) %>%
+    select(cultivar, dai, isolate, species, genotype, spike,
+           above) %>%
+  group_by(isolate, species, genotype, spike, dai) %>%
+  summarize(median_above = median(above)) %>%
+  do(tidy(audpc(.$median_above, .$dai)))
+names(audpc_194_above)[6] <- "audpc"
+
+audpc_194_below <- patogen %>%
+  filter (cultivar == "BRS 194") %>%
+  filter(exp == 2) %>%
+  select(1, 3:7, 11) %>%
+  group_by(isolate, species, genotype, spike, dai) %>%
+  summarize(median_below = median(below)) %>%
+  do(tidy(audpc(.$median_below, .$dai)))
+names(audpc_194_below)[6] <- "audpc"
+  hist(log(audpc_194_below$audpc))
+
+
+  # lsmeans aupdc below
+
+library(lme4)
+mix_194_below <- glmer.nb(audpc ~ genotype +
+                        ( 1| species) + (1 | spike),
+                      data = audpc_194_below,  REML= FALSE)
+
+plot(mix_194_below)
+summary(mix_194_below)
+library(car)
+anova(mix_194_below)
+Anova(mix_194_below)
+
+library(lsmeans)
+lsm <- lsmeans(mix_194_below, ~ genotype)
+cld(lsm)
+
+
+par(mfrow=c(1,1))
+par(mar=c(4,2.0,2,1))
+plot(mix_194_below,type=c("p","smooth"))
+
+
+mix_194_above <- glmer.nb(audpc ~ genotype +
+                            ( 1| species) + (1 | spike),
+                          data = audpc_194_above,  REML= FALSE)
+
+plot(mix_194_above)
+summary(mix_194_above)
+Anova(mix_194_above)
+
+library(lsmeans)
+lsm <- lsmeans(mix_194_above, ~ genotype)
+cld(lsm)
+
+par(mfrow=c(1,1))
+par(mar=c(4,2.0,2,1))
+plot(mix_194_above,type=c("p","smooth"))
+
+
+
+# Guamirim
+
+audpc_gua_above <- patogen %>%
+  filter (cultivar == "BRS Guamirim") %>%
+  filter(exp == 2) %>%
+  select(cultivar, dai, isolate, species, genotype, spike,
+         above) %>%
+  group_by(isolate, species, genotype, spike, dai) %>%
+  summarize(median_above = median(above)) %>%
+  do(tidy(audpc(.$median_above, .$dai)))
+names(audpc_gua_above)[6] <- "audpc"
+
+audpc_gua_below <- patogen %>%
+  filter (cultivar == "BRS Guamirim") %>%
+  filter(exp == 2) %>%
+  select(1, 3:7, 11) %>%
+  group_by(isolate, species, genotype, spike, dai) %>%
+  summarize(median_below = median(below)) %>%
+  do(tidy(audpc(.$median_below, .$dai)))
+names(audpc_gua_below)[6] <- "audpc"
+hist(log(audpc_gua_below$audpc))
+
+
+# lsmeans aupdc below
+
+library(lme4)
+mix_gua_below <- glmer.nb(audpc ~ genotype +
+                            ( 1| species) + (1 | spike),
+                          data = audpc_gua_below,  REML= FALSE)
+
+plot(mix_gua_below)
+summary(mix_gua_below)
+library(car)
+anova(mix_gua_below)
+Anova(mix_gua_below)
+
+library(lsmeans)
+lsm <- lsmeans(mix_gua_below, ~ genotype)
+cld(lsm)
+
+
+par(mfrow=c(1,1))
+par(mar=c(4,2.0,2,1))
+plot(mix_194_below,type=c("p","smooth"))
+
+
+mix_gua_above <- glmer.nb(audpc ~ genotype +
+                            ( 1| species) + (1 | spike),
+                          data = audpc_gua_above,  REML= FALSE)
+
+plot(mix_gua_above)
+summary(mix_gua_above)
+Anova(mix_gua_above)
+
+library(lsmeans)
+lsm <- lsmeans(mix_gua_above, ~ genotype)
+cld(lsm)
+
+par(mfrow=c(1,1))
+par(mar=c(4,2.0,2,1))
+plot(mix_194_above,type=c("p","smooth"))
+
+
+
+
+
+overdisp_fun <- function(model) {
+  ## number of variance parameters in
+  ##   an n-by-n variance-covariance matrix
+  vpars <- function(m) {
+    nrow(m)*(nrow(m)+1)/2
+  }
+  model.df <- sum(sapply(VarCorr(model),vpars))+length(fixef(model))
+  rdf <- nrow(model.frame(model))-model.df
+  rp <- residuals(model,type="pearson")
+  Pearson.chisq <- sum(rp^2)
+  prat <- Pearson.chisq/rdf
+  pval <- pchisq(Pearson.chisq, df=rdf, lower.tail=FALSE)
+  c(chisq=Pearson.chisq,ratio=prat,rdf=rdf,p=pval)
+
+
+}
+
+overdisp_fun(mix_194_below)
+overdisp_fun(mix_194_above)
+
+
+
+
+
+# new analysis severity
+library(agricolae)
+library(broom)
+audpc_194 <- patogen %>%
+  filter (cultivar == "BRS 194") %>%
+  filter(exp == 2) %>%
+  select(cultivar, dai, isolate, species, genotype, spike,
+         sev) %>%
+  group_by(isolate, species, genotype, spike, dai) %>%
+  summarize(mean_sev = mean(sev)) %>%
+  do(tidy(audpc(.$mean_sev, .$dai)))
+names(audpc_194)[6] <- "audpc"
+
+
+audpc_gua <- patogen %>%
+  filter (cultivar == "BRS Guamirim") %>%
+  filter(exp == 2) %>%
+  select(cultivar, dai, isolate, species, genotype, spike,
+         sev) %>%
+  group_by(isolate, species, genotype, spike, dai) %>%
+  summarize(mean_sev = mean(sev)) %>%
+  do(tidy(audpc(.$mean_sev, .$dai)))
+names(audpc_gua)[6] <- "audpc"
+
+
+audpc_194 %>%
+  group_by(species, genotype) %>%
+  summarize(mean_audpc = mean(audpc),
+            sd_audpc = sd(audpc)) %>%
+  ggplot(aes(species, mean_audpc, color = genotype))+
+  coord_flip()+
+  geom_point(position = position_dodge(width=0.4))+
+  geom_errorbar(aes(min = mean_audpc - sd_audpc, max = mean_audpc + sd_audpc),position = position_dodge(width=0.4), width=0.2)
+
+
+
+audpc_gua %>%
+  group_by(species, genotype) %>%
+  summarize(mean_audpc = mean(audpc),
+            sd_audpc = sd(audpc)) %>%
+  ggplot(aes(species, mean_audpc, color = genotype))+
+  coord_flip()+
+  geom_point(position = position_dodge(width=0.4))+
+  geom_errorbar(aes(min = mean_audpc - sd_audpc, max = mean_audpc + sd_audpc), position = position_dodge(width=0.4), width=0.2)
+
+
+
+# lsmeans aupdc gua
+
+library(lme4)
+mix_gua <- lmer(audpc ~ species +
+            ( 1| species) + (1 | spike),
+            data = audpc_gua,  REML= FALSE)
+
+plot(mix_gua)
+summary(mix_gua)
+library(car)
+anova(mix_gua)
+Anova(mix_gua)
+
+library(lsmeans)
+lsm <- lsmeans(mix_gua, ~ species)
+cld(lsm)
+
+
+
+# lsmeans aupdc 194
+
+library(lme4)
+mix_194 <- lmer(audpc ~ species +( 1| species) + (1 | spike),              data = audpc_194, REML= FALSE)
+
+plot(mix_194)
+summary(mix_194)
+library(car)
+
+anova(mix_194)
+Anova(mix_194)
+
+library(lsmeans)
+lsm <- lsmeans(mix_194, ~ species)
+cld(lsm)
+
+
+
+
+
+

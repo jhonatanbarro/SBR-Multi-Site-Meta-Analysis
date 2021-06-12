@@ -1,0 +1,81 @@
+---
+title: Meta-analysis of the effect of DMI+QoI mixtures plus mancozeb on Asian soybean
+  rust and yield return
+author: "Franklin Machado"
+date: "September 5, 2017"
+output:
+  html_document:
+    fig_width: 10
+    number_sections: yes
+    theme: cerulean
+    toc: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+  word_document: default
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, echo = FALSE)
+
+# Load packages 
+library(tidyverse)
+library(plyr)
+library(readxl)
+library(metafor)
+library(ggthemes)
+library(cowplot)
+library(scales)
+library(knitr)
+library(nloptr)
+library(minqa)
+library(broom)
+library(DT)
+```
+
+## Import data
+
+```{r}
+# import data
+dat_filtrado <- read_excel("dat_filtrado.xlsx", 2) %>% filter(AI != "NA")
+tail(dat_filtrado)
+
+kable(data.frame(table(dat_filtrado$AI)))
+length(unique(dat_filtrado$study))
+
+# Numero de estudos por fungicida
+
+dat6 <- data.frame(table(dat_filtrado$AI, dat_filtrado$study))
+dat7 <- dat6 %>% 
+  filter(Freq > 0)
+dat7
+data.frame(table(dat7$Var1))
+
+
+
+
+```
+
+## Control efficacy
+
+```{r}
+ma_AI_sev2 <- rma.mv(yi_sev, vi_sev, mods= ~ AI,  method="ML",  random = list(~ AI | study, ~1 | id), struct="UN", control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_sev2)
+
+anova(ma_AI_sev2, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+ data.frame(estimate = round((1-exp(ma_AI_sev2$b))*100, 4), 
+           ci.lb = round((1-exp(ma_AI_sev2$ci.ub))*100, 4),
+           ci.ub = round((1-exp(ma_AI_sev2$ci.lb))*100, 4))
+
+```

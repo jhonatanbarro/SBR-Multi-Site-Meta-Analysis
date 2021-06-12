@@ -1,0 +1,221 @@
+---
+title: Yield return of DMI+QoI mixtures plus mancozeb on Asian soybean rust 
+author: "Franklin Machado"
+date: "September 5, 2017"
+output:
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, echo = FALSE)
+
+# Load packages 
+library(tidyverse)
+library(plyr)
+library(readxl)
+library(metafor)
+library(ggthemes)
+library(cowplot)
+library(scales)
+library(knitr)
+library(nloptr)
+library(minqa)
+library(broom)
+library(DT)
+```
+
+
+# Import data
+
+```{r}
+dat_filtrado <- read_excel("dat_filtrado.xlsx", 2) %>% filter(yield_kg != "NA")
+
+kable(dat_filtrado %>% filter(AI == "AACHECK") %>% mutate(local = paste(location, state, sep =  ", ")) %>% select(study, year, local, cultivar, check_sev_r6, check_yield_kg))
+
+
+dat_filtrado %>% filter(AI == "AACHECK") %>% summary(.$check_yield_kg)
+
+```
+
+# Descritive
+
+## Entries by active ingridients
+
+```{r}
+
+kable(data.frame(table(dat_filtrado$AI)))
+length(unique(dat_filtrado$study))
+
+```
+
+## Studies by active ingridients
+
+```{r}
+dat6 <- data.frame(table(dat_filtrado$AI, dat_filtrado$study))
+dat7 <- dat6 %>% 
+  filter(Freq > 0)
+kable(data.frame(table(dat7$Var1)))
+
+```
+
+# Meta-analysis
+
+## D
+
+```{r}
+
+
+ma_AI_filtrado <- rma.mv(yi2, vi2, mods= ~ AI,  method="ML", random = list(~ AI | study, ~1 | id), struct="UN", control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_filtrado)
+
+anova(ma_AI_filtrado, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                     c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                     c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                     c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                     c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                     c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                     c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+
+```
+
+## Percent yield return
+
+```{r}
+ma_AI_perc_yield2 <- rma.mv(yi, vi, mods= ~ AI,  method="ML", random = list(~ AI | study, ~1 | id),  struct="UN",control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_perc_yield2)
+
+anova(ma_AI_perc_yield2, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+data.frame(estimate = round((exp(ma_AI_perc_yield2$b)-1)*100, 4), 
+           ci.lb = round((exp(ma_AI_perc_yield2$ci.lb)-1)*100, 4),
+           ci.ub = round((exp(ma_AI_perc_yield2$ci.ub)-1)*100, 4))
+```
+
+
+## Effect of the number of applications on yield return (D) by AI
+
+### Descritive 
+
+#### Number of studies by active ingridients
+
+```{r}
+dat6 <- data.frame(table(AI = dat_filtrado$AI, n_spray = dat_filtrado$n_spray))
+dat6 %>% group_by(n_spray) %>% 
+  filter(Freq > 0)
+
+```
+
+### M-A
+
+```{r}
+
+ma_AI_nspray <- rma.mv(yi2, vi2, mods= ~ AI * factor(n_spray),  method="ML", random = list(~ AI | study, ~1 | id), struct="UN", control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_nspray)
+
+```
+
+## Effect of the disease pressure on yield return (D) by AI
+
+### Descritive 
+
+#### Entries by active ingridients
+
+```{r}
+# Create a variable dis_press (low = <60%; high = >=60%)
+dat_filtrado$dis_press <- ifelse(dat_filtrado$check_sev_r6 < 60, "low", "high")
+
+dat6 <- data.frame(table(AI = dat_filtrado$AI, dis_press = dat_filtrado$dis_press))
+dat6 %>% group_by(dis_press) %>% 
+  filter(Freq > 0)
+
+```
+
+### M-A
+
+```{r}
+
+ma_AI_nspray <- rma.mv(yi2, vi2, mods= ~ AI * dis_press,  method="ML", random = list(~ AI | study, ~1 | id), struct="UN", control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_nspray)
+
+```
+
+# Plots
+
+## Boxplot yield by fungicide
+
+```{r}
+
+dat_filtrado %>% filter(yield_kg != "NA") %>% ggplot(aes(AI, yield_kg, fill = manc))+
+geom_boxplot(outlier.size = NA)+ 
+  theme_minimal()+
+geom_jitter(width = 0.1, height = 0.1, shape = 21, alpha=0.4)+
+theme(axis.text.x = element_text(angle = 25, hjust = 1))+
+scale_fill_grey(start = 0.5, end = 0.95)+
+  scale_x_discrete(labels = c("AACHECK" = "CHECK"))+
+  theme(legend.position = "none")+
+  labs(title ="", x = "", y = "Yield (kg/ha)")+
+  ggsave("figs/yield_AI.png", width=7, height=4)
+
+```
+
+## Other option Boxplot yield by fungicide
+
+### create variable for each fungicide
+
+```{r}
+dat_filtrado$fung_name <- ifelse(dat_filtrado$AI == "PICO + CYPR", "PICO + CYPR",
+                          ifelse(dat_filtrado$AI == "PICO + CYPR + MANC","PICO + CYPR",
+                          ifelse(dat_filtrado$AI == "AZOX + BENZ","AZOX + BENZ",
+                          ifelse(dat_filtrado$AI == "AZOX + BENZ + MANC","AZOX + BENZ",
+                          ifelse(dat_filtrado$AI == "TFLX + PROT", "TFLX + PROT",
+                          ifelse(dat_filtrado$AI == "TFLX + PROT + MANC","TFLX + PROT",
+                          ifelse(dat_filtrado$AI == "PICO + TEBU","PICO + TEBU",
+                          ifelse(dat_filtrado$AI == "PICO + TEBU + MANC","PICO + TEBU",
+                          ifelse(dat_filtrado$AI == "PYRA + EPOX","PYRA + EPOX",
+                          ifelse(dat_filtrado$AI == "PYRA + EPOX + MANC","PYRA + EPOX",
+                          ifelse(dat_filtrado$AI == "PYRA + FLUX", "PYRA + FLUX",
+                          ifelse(dat_filtrado$AI == "PYRA + FLUX + MANC", "PYRA + FLUX",
+                          ifelse(dat_filtrado$AI == "AZOX + CYPR","AZOX + CYPR",
+                          ifelse(dat_filtrado$AI == "AZOX + CYPR + MANC","AZOX + CYPR","AACHECK"))))))))))))))
+
+```
+
+### Plot 
+
+```{r}
+
+yield_AI_box <- dat_filtrado %>% filter(yield_kg != "NA") %>% 
+  ggplot(aes(fung_name, yield_kg,  fill = manc))+
+  geom_boxplot(outlier.colour = NA, position = position_dodge(width = 0.9))+ 
+  theme_minimal()+
+  geom_jitter(position=position_jitterdodge(dodge.width=0.95),  shape = 21, size=1,  alpha=0.7)+
+  #theme(axis.text.x = element_text(angle = 25, hjust = 1))+
+  scale_x_discrete(labels = c("AACHECK" = "CHECK"))+
+  scale_fill_grey(start = 0.3, end = 0.95)+
+   scale_x_discrete(labels = c("AACHECK" = "CHECK", "AZOX + BENZ" = "AZOX \n +\n BENZ", "AZOX + CYPR" = "AZOX \n +\n CYPR","PICO + CYPR" = "PICO \n +\n CYPR", "PICO + TEBU" = "PICO \n +\n TEBU", "PYRA + EPOX" = "PYRA \n +\n EPOX", "PYRA + FLUX" = "PYRA \n +\n FLUX", "TFLX + PROT" = "TFLX \n +\n PROT"))+
+ theme(legend.position = "none" 
+        #axis.text.x=element_blank(),
+       #legend.margin = margin(-1, 0, 0, 0)
+       )+
+  labs(title ="", x = "", y = "Yield (kg/ha)", fill = "")+
+  scale_y_continuous(breaks=c(0, 1000,  2000, 3000, 4000, 5000, 6000))
+
+
+```

@@ -1,0 +1,362 @@
+% Code
+
+# Introduction
+
+In this analysis.. 
+
+
+# Load packages
+
+The packages necessary for this analysis..
+
+```{r message=FALSE}
+library(tidyverse)
+library(readxl)
+library(metafor)
+library(broom)
+library(here)
+library(knitr)
+library(kableExtra)
+library(cowplot)
+```
+
+# Import data
+
+```{r}
+# import data
+caf_upl <- read_excel(here("data", "caf_upl_10092018.xlsx"), 1) %>%
+  filter(AI != "NA")
+```
+
+
+# Meta-analysis
+
+## Yield
+### Effect-size and variance
+
+We will use the log of means and respective sampling variance
+
+
+```{r}
+caf_upl1 <- caf_upl %>%
+  filter(yield_kg != "NA") %>% 
+  mutate(yi2 = yield_kg,
+    vi2 = V_yield / 4,
+    id = 1:nrow(.)) %>% 
+  unite("dose1", manc_product, dose_manc, sep = "_")
+
+table(caf_upl1$AI, caf_upl1$source)
+
+dat_freq <- data.frame(table(AI = caf_upl1$AI, source = caf_upl1$source, caf_upl1$study))
+dat_freq2 <- dat_freq %>%
+  filter(Freq > 0)
+table(AI = dat_freq2$AI, source = dat_freq2$source)
+
+
+```
+
+
+### Yield return - MANCOZEB overal effect 
+
+```{r,cache=TRUE}
+
+ma1_manc <- rma.mv(yi2, vi2, mods = ~manc, random = list(~ manc | study, ~1 | id), struct = "UN", method = "ML", control = list(optimizer = "nlm"), data = caf_upl1)
+```
+
+```{r}
+summary(ma1_manc)
+
+anova(ma1_manc, L = rbind(
+  c(0, 1, -1)))
+
+
+```
+
+
+### Yield return - MANCOZEB product
+
+```{r,cache=TRUE}
+
+ma1_product <- rma.mv(yi2, vi2, mods = ~ dose1, random = list(~ dose1 | study, ~1 | id), struct = "UN", method = "ML", control = list(optimizer = "nlm"), data = caf_upl1)
+```
+
+```{r}
+summary(ma1_product)
+
+
+
+```
+
+
+### Yield return - overal effect by AI 
+
+```{r,cache=TRUE}
+
+ma1_caf_upl <- rma.mv(yi2, vi2, mods = ~AI, random = list(~ AI | study, ~1 | id), struct = "UN", method = "ML", control = list(optimizer = "nlm"), data = caf_upl1)
+```
+
+```{r}
+
+summary(ma1_caf_upl)
+
+anova(ma1_caf_upl, L = rbind(
+  c(0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1)
+))
+```
+
+## Sev
+### Effect-size and variance
+
+```{r}
+caf_upl2 <- caf_upl %>% 
+  filter(sev_r6 != "NA" & sev_r6 != 0) %>% 
+  slice(-420) %>% #remove a specific line by position. Remove the treatment without manc after filtering sev < 0 at the same trial
+  mutate(vi = V_sev / (4 * sev_r6 ^ 2),
+    yi = log(sev_r6),
+    id = 1:nrow(.)) %>% 
+  unite("dose1", manc_product, dose_manc, sep = "_") 
+# %>% filter(study != "11_2016/17" & study != "12_2016/17" & study != "13_2016/17")
+
+
+table(caf_upl2$AI, caf_upl2$source)
+
+dat_freq <- data.frame(table(AI = caf_upl2$AI, source = caf_upl2$source, caf_upl2$study))
+dat_freq2 <- dat_freq %>%
+  filter(Freq > 0)
+table(AI = dat_freq2$AI, source = dat_freq2$source)
+
+#openxlsx::write.xlsx(caf_upl2, here("data","caf_upl3.xlsx"), colNames = TRUE)
+```
+
+
+### Control efficacy - MANCOZEB overal effect 
+
+```{r,cache=TRUE}
+
+ma2_manc <- rma.mv(yi, vi, mods = ~manc, random = list(~ manc | study, ~1 | id), struct = "UN", method = "ML", control = list(optimizer = "nlm"), data = caf_upl2)
+
+```
+
+```{r}
+summary(ma2_manc)
+
+anova(ma2_manc, L = rbind(
+  c(0, -1, 1)))
+
+data.frame(
+  estimate = round((1 - exp(ma2_manc$b)) * 100, 4),
+  ci.lb = round((1 - exp(ma2_manc$ci.ub)) * 100, 4),
+  ci.ub = round((1 - exp(ma2_manc$ci.lb)) * 100, 4)
+)
+```
+
+
+
+
+### Control efficacy - MANCOZEB product 
+
+```{r,cache=TRUE}
+
+ma2_product <- rma.mv(yi, vi, mods = ~dose1, random = list(~ dose1 | study, ~1 | id), struct = "UN", method = "ML", control = list(optimizer = "nlm"), data = caf_upl2)
+```
+
+```{r}
+summary(ma2_product)
+
+
+
+data.frame(
+  estimate = round((1 - exp(ma2_product$b)) * 100, 4),
+  ci.lb = round((1 - exp(ma2_product$ci.ub)) * 100, 4),
+  ci.ub = round((1 - exp(ma2_product$ci.lb)) * 100, 4)
+)
+```
+
+### Control efficacy - overal effect by AI
+
+```{r,cache=TRUE}
+
+
+ma2_caf_upl <- rma.mv(yi, vi, mods = ~AI, random = list(~ AI | study, ~1 | id), struct = "UN", method = "ML", control = list(optimizer = "nlm"), data = caf_upl2)
+```
+
+```{r}
+
+summary(ma2_caf_upl)
+
+anova(ma2_caf_upl, L = rbind(
+  c(0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0),
+  c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1)
+))
+
+data.frame(
+  estimate = round((1 - exp(ma2_caf_upl$b)) * 100, 4),
+  ci.lb = round((1 - exp(ma2_caf_upl$ci.ub)) * 100, 4),
+  ci.ub = round((1 - exp(ma2_caf_upl$ci.lb)) * 100, 4)
+)
+```
+
+
+## Plots
+
+## Map
+
+```{r}
+caf_upl1 %>% 
+  ggplot(aes(AI, yield_kg, fill = source))+
+  geom_boxplot()+
+  theme_minimal()+
+  facet_wrap(~year, ncol = 2)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+## Boxplots
+### Sev
+
+```{r}
+
+### create variable for each fungicide
+
+caf_upl2$fung_name <- ifelse(caf_upl2$AI == "PICO + CYPR", "PICO + CYPR",
+                          ifelse(caf_upl2$AI == "PICO + CYPR + MANC","PICO + CYPR",
+                          ifelse(caf_upl2$AI == "AZOX + BENZ","AZOX + BENZ",
+                          ifelse(caf_upl2$AI == "AZOX + BENZ + MANC","AZOX + BENZ",
+                          ifelse(caf_upl2$AI == "TFLX + PROT", "TFLX + PROT",
+                          ifelse(caf_upl2$AI == "TFLX + PROT + MANC","TFLX + PROT",
+                          ifelse(caf_upl2$AI == "PICO + TEBU","PICO + TEBU",
+                          ifelse(caf_upl2$AI == "PICO + TEBU + MANC","PICO + TEBU",
+                          ifelse(caf_upl2$AI == "PYRA + EPOX","PYRA + EPOX",
+                          ifelse(caf_upl2$AI == "PYRA + EPOX + MANC","PYRA + EPOX",
+                          ifelse(caf_upl2$AI == "PYRA + FLUX", "PYRA + FLUX",
+                          ifelse(caf_upl2$AI == "PYRA + FLUX + MANC", "PYRA + FLUX",
+                          ifelse(caf_upl2$AI == "AZOX + CYPR","AZOX + CYPR",
+                          ifelse(caf_upl2$AI == "AZOX + CYPR + MANC","AZOX + CYPR","AACHECK"))))))))))))))
+
+
+sev_AI_box <- caf_upl2 %>% 
+  ggplot(aes(fung_name, sev_r6,  fill = manc))+
+  geom_boxplot(outlier.colour = NA, position = position_dodge(width = 0.9))+ 
+  theme_minimal()+
+  geom_jitter(position=position_jitterdodge(dodge.width=0.95),  shape = 21, size=1,  alpha=0.7)+
+  scale_fill_grey(start = 0.3, end = 0.95, breaks=c("AACHECK", "without", "with"),
+    labels=c("CHECK", "without Mancozeb", "with Mancozeb"))+
+ theme(legend.position = "top",
+       axis.text.x=element_blank(), 
+       legend.margin = margin(-0.5, 0, 0, 0, unit = "cm")
+      #plot.margin = margin(-0.5, 0, 0, 0, unit = "cm")
+       )+
+  labs(title ="", x = "", y = "Severity (%)", fill = " ")
+
+```
+
+### Yield
+
+```{r}
+### create variable for each fungicide
+
+caf_upl1$fung_name <- ifelse(caf_upl1$AI == "PICO + CYPR", "PICO + CYPR",
+                          ifelse(caf_upl1$AI == "PICO + CYPR + MANC","PICO + CYPR",
+                          ifelse(caf_upl1$AI == "AZOX + BENZ","AZOX + BENZ",
+                          ifelse(caf_upl1$AI == "AZOX + BENZ + MANC","AZOX + BENZ",
+                          ifelse(caf_upl1$AI == "TFLX + PROT", "TFLX + PROT",
+                          ifelse(caf_upl1$AI == "TFLX + PROT + MANC","TFLX + PROT",
+                          ifelse(caf_upl1$AI == "PICO + TEBU","PICO + TEBU",
+                          ifelse(caf_upl1$AI == "PICO + TEBU + MANC","PICO + TEBU",
+                          ifelse(caf_upl1$AI == "PYRA + EPOX","PYRA + EPOX",
+                          ifelse(caf_upl1$AI == "PYRA + EPOX + MANC","PYRA + EPOX",
+                          ifelse(caf_upl1$AI == "PYRA + FLUX", "PYRA + FLUX",
+                          ifelse(caf_upl1$AI == "PYRA + FLUX + MANC", "PYRA + FLUX",
+                          ifelse(caf_upl1$AI == "AZOX + CYPR","AZOX + CYPR",
+                          ifelse(caf_upl1$AI == "AZOX + CYPR + MANC","AZOX + CYPR","AACHECK"))))))))))))))
+
+
+yield_AI_box <- caf_upl1 %>% 
+  ggplot(aes(fung_name, yield_kg,  fill = manc))+
+  geom_boxplot(outlier.colour = NA, position = position_dodge(width = 0.9))+ 
+  theme_minimal()+
+  geom_jitter(position=position_jitterdodge(dodge.width=0.95),  shape = 21, size=1,  alpha=0.7)+
+  scale_fill_grey(start = 0.3, end = 0.95, breaks=c("AACHECK", "without", "with"))+
+  scale_x_discrete(labels = c("AACHECK" = "CHECK", "AZOX + BENZ" = "AZOX \n +\n BENZ", "AZOX + CYPR" = "AZOX \n +\n CYPR","PICO + CYPR" = "PICO \n +\n CYPR", "PICO + TEBU" = "PICO \n +\n TEBU", "PYRA + EPOX" = "PYRA \n +\n EPOX", "PYRA + FLUX" = "PYRA \n +\n FLUX", "TFLX + PROT" = "TFLX \n +\n PROT"))+
+  theme(legend.position = "none",
+        plot.margin = margin(-0.5, 0, 0, 0, unit = "cm")
+       )+
+  labs(title ="", x = "", y = "Yield (kg/ha)", fill = "Mancozeb")+
+  scale_y_continuous(breaks=c(0, 1000,  2000, 3000, 4000, 5000, 6000))
+
+combo <- plot_grid(sev_AI_box, yield_AI_box, labels=c('A', 'B'), align = "hv", ncol=1, rel_heights =  c(1, 1))
+ggsave("figs/combo_box1.png", combo, width=5, height=6, dpi=800)
+
+
+```
+
+## Relationship C and D
+
+```{r}
+library(ggrepel)
+dat_yield_gain <- read_excel(here("data", "results.xlsx"), 3)
+
+#set.seed(42)
+plot_yield_gain <- dat_yield_gain %>% filter(manc != "with") %>% 
+  ggplot(aes(est, gain, fill = ai)) + 
+  geom_errorbar(aes(ymin = gain_low, ymax = gain_high), width=10, size= 0.6)+
+  geom_errorbarh(aes(xmin = est_low, xmax = est_high), height= 7 , size= 0.6)+
+  geom_label_repel(aes(est, gain, label = ai),
+    fontface = 'bold', size=3, color = 'black',label.size=0.25, segment.alpha = 0.6, 
+    box.padding = unit(0.35, "lines"), segment.colour="gray10", min.segment.length = 0)+
+  geom_point(size = 2)+
+  theme_minimal()+
+  scale_fill_grey(start = 0.9, end = 0.9)+
+  labs(y = "MANCOZEB gain in yield (kg/ha)", x = "Yield return (kg/ha)", fill = " ")+
+ theme(text = element_text(size=16), 
+       #legend.text=element_text(face="italic", size=11),
+       #axis.text = element_text(size=11),
+       legend.position = "none"
+       #,legend.justification = c("right", "top")
+       ) +
+  ggsave("figs/yield_gain_manc.png",width=6.5, height=4.2, dpi=300)
+
+
+```
+
+
+```{r}
+library(ggrepel)
+dat_sev_gain <- read_excel(here("data", "results.xlsx"), 4)
+
+#set.seed(42)
+plot_sev_gain <- dat_sev_gain %>% filter(manc != "with") %>% 
+  ggplot(aes(est, gain, fill = ai)) + 
+  geom_point(size = 2)+
+  geom_errorbar(aes(ymin = gain_low, ymax = gain_high), width=0.8, size= 0.6)+
+  geom_errorbarh(aes(xmin = est_low, xmax = est_high), height= 0.6 , size= 0.6)+
+  geom_label_repel(aes(est, gain, label = ai),
+    fontface = 'bold', size=3, color = 'black',label.size=0.25, segment.alpha = 0.6, 
+    box.padding = unit(0.35, "lines"), segment.colour="gray10", min.segment.length = 0)+
+  geom_point(size = 2)+
+  theme_minimal()+
+  scale_fill_grey(start = 0.9, end = 0.9)+
+  labs(y = "MANCOZEB gain in control (%)", x = "Control efficacy (%)")+
+ theme(text = element_text(size=16), 
+       #legend.text=element_text(face="italic", size=11),
+       #axis.text = element_text(size=11),
+       legend.position = "none"
+       #,legend.justification = c("right", "top")
+       ) +
+  ggsave("figs/sev_gain_manc.png",width=6.5, height=4.2, dpi=300)
+
+combo <- plot_grid(plot_yield_gain, plot_sev_gain, labels=c('A', 'B'), align = "hv", ncol=2, rel_heights =  c(1, 1))
+ggsave("figs/combo_gain_relation.png", combo, width=9, height=4.2, dpi=800)
+
+```
+

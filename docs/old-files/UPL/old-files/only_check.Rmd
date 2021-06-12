@@ -1,0 +1,297 @@
+---
+title: Meta-analysis of the effect of DMI+QoI mixtures plus mancozeb on Asian soybean
+  rust and yield return
+author: "Franklin Machado"
+date: "September 5, 2017"
+output:
+  html_document:
+    fig_width: 10
+    number_sections: yes
+    theme: cerulean
+    toc: yes
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+  word_document: default
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, echo = FALSE)
+
+# Load packages 
+library(tidyverse)
+library(plyr)
+library(readxl)
+library(metafor)
+library(ggthemes)
+library(cowplot)
+library(scales)
+library(knitr)
+library(nloptr)
+library(minqa)
+library(broom)
+library(DT)
+```
+
+# Import data
+
+```{r}
+
+Sys.setlocale("LC_ALL", 'pt_BR.UTF-8')
+# import data
+dat <- read_excel("geral_soja.xlsx", 2)
+
+
+
+#filter the check
+dat2 <- dat %>% group_by(study) %>% 
+  filter (fungicide == "CHECK" &
+            sev_r6 >0) %>% 
+  select(year, location, state, cultivar, data_plantio, sev_r6)
+
+openxlsx::write.xlsx(dat2, "dat2.xlsx")
+
+```
+
+# Descritive analysis
+
+## number of studies by fungicide
+
+```{r}
+dat_freq <- data.frame(table(dat2$AI, dat2$study))
+dat_freq2 <- dat_freq %>% 
+  filter(Freq > 0)
+dat_freq2
+kable(data.frame(table(dat_freq2$Var1)))
+
+
+
+```
+
+# Variables for MA
+
+
+
+```{r}
+# Calcula a variancia do ensaio (V)
+dat2$V_sev <- ((dat2$cv_sev_r6/100)*dat2$mean_sev)^2
+
+dat2$V_yield <- ((dat2$cv_yield_kg/100)*dat2$mean_yield)^2
+
+
+# Sampling variance for log of the mean (Paul et al., 2008) to use in multivariate model
+dat2$L.var_yield <- with(dat2, V_yield / (4 * yield_kg^2))
+dat2$L.var_sev <- with(dat2, V_sev / (4 * sev_r6^2))
+
+
+# Calculate the D
+dat2$D <-dat2$yield_kg - dat2$check_yield_kg
+
+# Sampling variance for yield
+dat2$var_D <- dat2$V_yield/4 
+
+
+
+# Multi treatment meta-analysis (response ratio) 
+# Preparing the variables: yi is the effect size and vi is the sampling variance
+dat2$yi <- log(dat2$yield_kg)
+dat2$vi <- dat2$L.var_yield
+dat2$id <- 1:nrow(dat2)
+
+
+dat2$yi_sev <- log(dat2$sev_r6)
+dat2$vi_sev <- dat2$L.var_sev
+
+# Multi treatment meta-analysis (D) 
+
+# Preparing the variables: yi is the effect size and vi is the sampling variance
+dat2$yi2 <- dat2$yield_kg
+dat2$vi2 <- dat2$var_D
+
+
+```
+
+# modelo multivariado
+
+## Yield return
+
+```{r}
+
+ma_AI <- rma.mv(yi2, vi2, mods= ~ AI,  method="ML", struct="UN", random = list(~ AI | study), control = list(optimizer="nlm"), data=dat2)
+
+summary(ma_AI)
+
+anova(ma_AI, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                     c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                     c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                     c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                     c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                     c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                     c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+
+
+```
+
+
+## Percent yield return
+
+
+```{r}
+
+ma_AI_perc_yield <- rma.mv(yi, vi, mods= ~ AI,  method="ML", struct="UN", random = list(~ AI | study), control = list(optimizer="nlm"), data=dat2)
+
+summary(ma_AI_perc_yield)
+
+anova(ma_AI_perc_yield, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+data.frame(estimate = round((exp(ma_AI_perc_yield$b)-1)*100, 4), 
+           ci.lb = round((exp(ma_AI_perc_yield$ci.lb)-1)*100, 4),
+           ci.ub = round((exp(ma_AI_perc_yield$ci.ub)-1)*100, 4))
+
+
+```
+
+## Control efficacy
+
+
+```{r}
+ma_AI_sev <- rma.mv(yi_sev, vi_sev, mods= ~ AI,  method="ML", struct="UN", random = list(~ AI | study), control = list(optimizer="nlm"), data=dat2)
+
+summary(ma_AI_sev)
+
+anova(ma_AI_sev, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+ data.frame(estimate = round((1-exp(ma_AI_sev$b))*100, 4), 
+           ci.lb = round((1-exp(ma_AI_sev$ci.ub))*100, 4),
+           ci.ub = round((1-exp(ma_AI_sev$ci.lb))*100, 4))
+
+
+```
+
+
+# Mantendo só ensaios com e sem mancozeb no mesmo estudo
+
+## Import data
+
+```{r}
+# import data
+dat_filtrado <- read_excel("dat2.xlsx", 2) %>% filter(AI != "NA")
+tail(dat_filtrado)
+
+kable(data.frame(table(dat_filtrado$AI)))
+length(unique(dat_filtrado$study))
+
+# Numero de estudos por fungicida
+
+dat6 <- data.frame(table(dat_filtrado$AI, dat_filtrado$study))
+dat7 <- dat6 %>% 
+  filter(Freq > 0)
+dat7
+data.frame(table(dat7$Var1))
+
+
+
+
+```
+
+## D
+
+```{r}
+
+
+ma_AI_filtrado <- rma.mv(yi2, vi2, mods= ~ AI,  method="ML", struct="UN", random = list(~ AI | study), control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_filtrado)
+
+anova(ma_AI_filtrado, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                     c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                     c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                     c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                     c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                     c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                     c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+
+```
+
+## Percent yield return
+
+```{r}
+ma_AI_perc_yield2 <- rma.mv(yi, vi, mods= ~ AI,  method="ML", struct="UN", random = list(~ AI | study), control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_perc_yield2)
+
+anova(ma_AI_perc_yield2, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+data.frame(estimate = round((exp(ma_AI_perc_yield2$b)-1)*100, 4), 
+           ci.lb = round((exp(ma_AI_perc_yield2$ci.lb)-1)*100, 4),
+           ci.ub = round((exp(ma_AI_perc_yield2$ci.ub)-1)*100, 4))
+```
+
+## Control efficacy
+
+
+```{r}
+ma_AI_sev2 <- rma.mv(yi_sev, vi_sev, mods= ~ AI,  method="ML", struct="UN", random = list(~ AI | study), control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_sev2)
+
+anova(ma_AI_sev2, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+ data.frame(estimate = round((1-exp(ma_AI_sev2$b))*100, 4), 
+           ci.lb = round((1-exp(ma_AI_sev2$ci.ub))*100, 4),
+           ci.ub = round((1-exp(ma_AI_sev2$ci.lb))*100, 4))
+
+``` 
+ 
+# Plots
+
+```{r}
+# yield by fungicide
+
+dat2$AI <- revalue(dat2$AI, c("AACHECK" = "_CHECK"))
+
+dat2 %>% filter(yield_kg != "NA") %>% ggplot(aes(AI, yield_kg, fill = manc))+
+geom_boxplot(outlier.size = NA)+ 
+  theme_minimal()+
+geom_jitter(width = 0.1, height = 0.1, shape = 21, alpha=0.4)+
+theme(axis.text.x = element_text(angle = 25, hjust = 1))+
+scale_fill_grey(start = 0.5, end = 0.95)+
+  scale_x_discrete(labels = c("_CHECK" = "CHECK"))+
+  theme(legend.position = "none")+
+  labs(title ="", x = "", y = "Yield (kg/ha)")+
+  ggsave("figs/yield_AI.png", width=7, height=4)
+
+```
+
+
+
+

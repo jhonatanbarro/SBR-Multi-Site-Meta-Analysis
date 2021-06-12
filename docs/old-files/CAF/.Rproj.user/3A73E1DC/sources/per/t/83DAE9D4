@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1518215714316.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "83DAE9D4",
+    "lastKnownWriteTime" : 1509670142,
+    "last_content_update" : 1518215772531,
+    "path" : "~/Google Drive/Manuscripts/SBR-fungicide-resistance/R-codes-EMD/sbr-fungicide.Rmd",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "71,0",
+        "scrollLine" : "71"
+    },
+    "relative_order" : 59,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

@@ -1,0 +1,176 @@
+---
+title: Control efficacy of DMI+QoI mixtures plus mancozeb on Asian soybean rust 
+author: "Franklin Machado"
+date: "September 5, 2017"
+output:
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, echo = FALSE)
+
+# Load packages 
+library(tidyverse)
+library(readxl)
+library(metafor)
+library(ggthemes)
+library(cowplot)
+library(scales)
+library(knitr)
+library(nloptr)
+library(minqa)
+library(broom)
+library(DT)
+
+``` 
+
+# Import data
+
+```{r}
+# import data
+dat_filtrado <- read_excel("dat_filtrado.xlsx", 2) %>% filter(sev_r6 != "NA", yi_sev > 0)
+glimpse(dat_filtrado)
+```
+
+# Descritive 
+
+## Entries by active ingridients
+
+```{r}
+kable(data.frame(table(dat_filtrado$AI)))
+length(unique(dat_filtrado$study))
+```
+
+# Studies by active ingridients
+
+```{r}
+dat6 <- data.frame(table(dat_filtrado$AI, dat_filtrado$study))
+dat7 <- dat6 %>% 
+  filter(Freq > 0)
+kable(data.frame(table(dat7$Var1)))
+
+```
+
+# MA
+
+## Control efficacy
+
+```{r}
+
+dat_filtrado %>% 
+  filter(AI == "PYRA + EPOX" | AI == "PYRA + EPOX + MANC") %>% 
+  ggplot(aes(state, (1-(sev_r6/check_sev_r6))*100)) + 
+  geom_boxplot()+
+  facet_wrap(~AI)
+```
+
+```{r}
+
+ma_AI_sev2 <- rma.mv(yi_sev, vi_sev, mods= ~ AI,  method="ML",  random = list(~ AI | study, ~1 | id), struct="UN", control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_sev2)
+
+anova(ma_AI_sev2, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+ data.frame(estimate = round((1-exp(ma_AI_sev2$b))*100, 4), 
+           ci.lb = round((1-exp(ma_AI_sev2$ci.ub))*100, 4),
+           ci.ub = round((1-exp(ma_AI_sev2$ci.lb))*100, 4))
+
+```
+
+## Effect of the number of applications by AI
+
+```{r}
+
+  
+ma_AI_sev_nspray <- rma.mv(yi_sev, vi_sev, mods= ~ AI * factor(n_spray),  method="ML",  random = list(~ AI | study, ~1 | id), struct="UN", control = list(optimizer="nlm"), data=dat_filtrado)
+
+summary(ma_AI_sev_nspray)
+
+anova(ma_AI_sev_nspray, L=rbind(c(0,-1,1,0,0,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,-1,1,0,0,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,-1,1,0,0,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0),
+                         c(0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1)))
+
+ data.frame(estimate = round((1-exp(ma_AI_sev_nspray$b))*100, 4), 
+           ci.lb = round((1-exp(ma_AI_sev_nspray$ci.ub))*100, 4),
+           ci.ub = round((1-exp(ma_AI_sev_nspray$ci.lb))*100, 4))
+
+```
+
+# Plots 
+
+## Sev by fungicide
+
+```{r}
+
+dat_filtrado %>% filter(sev_r6 != "NA") %>% ggplot(aes(AI,sev_r6, fill = manc))+
+geom_boxplot(outlier.size = NA)+ 
+  theme_minimal()+
+geom_jitter(width = 0.1, height = 0.1, shape = 21, alpha=0.4)+
+theme(axis.text.x = element_text(angle = 25, hjust = 1))+
+scale_fill_grey(start = 0.5, end = 0.95)+
+  scale_x_discrete(labels = c("AACHECK" = "CHECK"))+
+  theme(legend.position = "none")+
+  labs(title ="", x = "", y = "Severity (%)")+
+  ggsave("figs/sev_AI.png", width=7, height=4)
+
+
+```
+## Other option Boxplot yield by fungicide
+
+### create variable for each fungicide
+
+```{r}
+dat_filtrado$fung_name <- ifelse(dat_filtrado$AI == "PICO + CYPR", "PICO + CYPR",
+                          ifelse(dat_filtrado$AI == "PICO + CYPR + MANC","PICO + CYPR",
+                          ifelse(dat_filtrado$AI == "AZOX + BENZ","AZOX + BENZ",
+                          ifelse(dat_filtrado$AI == "AZOX + BENZ + MANC","AZOX + BENZ",
+                          ifelse(dat_filtrado$AI == "TFLX + PROT", "TFLX + PROT",
+                          ifelse(dat_filtrado$AI == "TFLX + PROT + MANC","TFLX + PROT",
+                          ifelse(dat_filtrado$AI == "PICO + TEBU","PICO + TEBU",
+                          ifelse(dat_filtrado$AI == "PICO + TEBU + MANC","PICO + TEBU",
+                          ifelse(dat_filtrado$AI == "PYRA + EPOX","PYRA + EPOX",
+                          ifelse(dat_filtrado$AI == "PYRA + EPOX + MANC","PYRA + EPOX",
+                          ifelse(dat_filtrado$AI == "PYRA + FLUX", "PYRA + FLUX",
+                          ifelse(dat_filtrado$AI == "PYRA + FLUX + MANC", "PYRA + FLUX",
+                          ifelse(dat_filtrado$AI == "AZOX + CYPR","AZOX + CYPR",
+                          ifelse(dat_filtrado$AI == "AZOX + CYPR + MANC","AZOX + CYPR","AACHECK"))))))))))))))
+
+```
+
+### Plot 
+
+```{r}
+
+sev_AI_box <- dat_filtrado %>% filter(sev_r6 != "NA") %>% 
+  ggplot(aes(fung_name, sev_r6,  fill = manc))+
+  geom_boxplot(outlier.colour = NA, position = position_dodge(width = 0.9))+ 
+  theme_minimal()+
+  geom_jitter(position=position_jitterdodge(dodge.width=0.95),  shape = 21, size=1,  alpha=0.7)+
+  #theme(axis.text.x = element_text(angle = 25, hjust = 1))+
+  scale_fill_grey(start = 0.3, end = 0.95)+
+  scale_x_discrete(labels = c("AACHECK" = "CHECK", "AZOX + BENZ" = "AZOX \n +\n BENZ", "AZOX + CYPR" = "AZOX \n +\n CYPR","PICO + CYPR" = "PICO \n +\n CYPR", "PICO + TEBU" = "PICO \n +\n TEBU", "PYRA + EPOX" = "PYRA \n +\n EPOX", "PYRA + FLUX" = "PYRA \n +\n FLUX", "TFLX + PROT" = "TFLX \n +\n PROT"))+
+  theme(legend.position = "none")+
+  labs(title ="", x = "", y = "Severity (%)", fill = "Mancozeb")
+  #scale_y_continuous(breaks=c(0, 1000,  2000, 3000, 4000, 5000, 6000))
+
+combo <- plot_grid(yield_AI_box, sev_AI_box, labels=c('A', 'B'), align = "hv", ncol=1, rel_heights =  c(1, 1.05))
+ggsave("figs/combo_box1.png", combo, width=5, height=6, dpi=800)
+
+```

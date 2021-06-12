@@ -1,0 +1,22 @@
+
+
+
+## Meta-analysis
+
+## Importando o arquivo de dados
+library(dplyr)
+library(readxl)
+library(magrittr)
+data1 <- read_excel("dados-flavio.xlsx")
+
+data2<- data1 %>%
+  group_by(ensaio, trat) %>%
+  summarize(inc=mean(inc), sev=mean(ig), yield=mean(prod), ph=mean(ph), pms=mean(pms))
+
+
+library(openxlsx)
+write.xlsx(data2, file = "Dados_Flavio_summary.xlsx")
+
+write.csv(data2, file = "Dados_Flavio_summary.csv")
+
+library(Rtools)
